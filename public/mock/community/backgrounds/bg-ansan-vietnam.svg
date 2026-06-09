@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-label="Ansan Vietnam community background">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0B4A8B"/>
+      <stop offset="0.55" stop-color="#1B9AAA"/>
+      <stop offset="1" stop-color="#E9F8F6"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="0" x2="1">
+      <stop offset="0" stop-color="#DA251D"/>
+      <stop offset="1" stop-color="#FFCD00"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="520" fill="url(#sky)"/>
+  <circle cx="960" cy="90" r="160" fill="#FFCD00" opacity=".38" filter="url(#soft)"/>
+  <path d="M0 374c132-52 231-54 340-21 116 35 208 88 348 67 145-22 232-114 412-78 76 15 125 42 200 32v146H0Z" fill="#06375E" opacity=".55"/>
+  <path d="M0 410c138-38 246-32 349 2 113 37 204 66 330 42 156-30 254-105 416-60 65 18 107 38 205 30v96H0Z" fill="#F5FBFF" opacity=".82"/>
+  <g transform="translate(74 92)" opacity=".92">
+    <rect x="0" y="0" width="310" height="184" rx="34" fill="#ffffff" opacity=".16"/>
+    <path d="M65 60h180M65 98h220M65 136h145" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".52"/>
+  </g>
+  <g transform="translate(765 238)">
+    <rect x="0" y="0" width="248" height="72" rx="36" fill="#fff" opacity=".22"/>
+    <circle cx="45" cy="36" r="22" fill="url(#warm)"/>
+    <path d="M95 27h105M95 46h76" stroke="#fff" stroke-width="11" stroke-linecap="round" opacity=".78"/>
+  </g>
+  <g transform="translate(426 120)">
+    <circle cx="84" cy="84" r="84" fill="#DA251D" opacity=".82"/>
+    <polygon points="84,28 97,68 139,68 105,93 118,133 84,108 50,133 63,93 29,68 71,68" fill="#FFCD00"/>
+  </g>
+</svg>

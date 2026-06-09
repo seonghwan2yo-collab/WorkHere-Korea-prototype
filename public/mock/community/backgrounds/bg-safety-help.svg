@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-label="Safety help room background">
+  <defs>
+    <linearGradient id="base" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#123C69"/>
+      <stop offset=".56" stop-color="#185A8D"/>
+      <stop offset="1" stop-color="#F5E6D3"/>
+    </linearGradient>
+    <linearGradient id="alert" x1="0" x2="1">
+      <stop offset="0" stop-color="#B42318"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="520" fill="url(#base)"/>
+  <circle cx="190" cy="120" r="150" fill="#F97316" opacity=".22" filter="url(#glow)"/>
+  <circle cx="1010" cy="380" r="180" fill="#0EA5E9" opacity=".22" filter="url(#glow)"/>
+  <path d="M0 352c184-70 342-37 472 20 122 53 248 67 389 16 99-36 173-71 339-37v169H0Z" fill="#071C33" opacity=".5"/>
+  <g transform="translate(466 86)">
+    <path d="M134 0 255 54v91c0 96-54 177-121 213C67 322 13 241 13 145V54Z" fill="#fff" opacity=".20"/>
+    <path d="M134 32 226 73v73c0 74-40 137-92 168-52-31-92-94-92-168V73Z" fill="url(#alert)" opacity=".82"/>
+    <path d="m92 160 38 38 82-94" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(84 132)" opacity=".86">
+    <rect x="0" y="0" width="298" height="78" rx="39" fill="#fff" opacity=".18"/>
+    <path d="M62 27h164M62 51h112" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(812 184)" opacity=".88">
+    <rect x="0" y="0" width="318" height="92" rx="34" fill="#fff" opacity=".18"/>
+    <circle cx="56" cy="46" r="24" fill="#F97316"/>
+    <path d="M104 32h168M104 58h116" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+  </g>
+</svg>

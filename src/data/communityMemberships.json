@@ -1,0 +1,7 @@
+[
+  { "groupId": "ansan-vn", "userId": 1, "role": "member", "status": "joined", "joinedAt": "2026-05-25" },
+  { "groupId": "cheongju-life", "userId": 1, "role": "member", "status": "joined", "joinedAt": "2026-05-26" },
+  { "groupId": "national-safety", "userId": 1, "role": "member", "status": "joined", "joinedAt": "2026-05-27" },
+  { "groupId": "changwon-uz", "userId": 7, "role": "staff", "status": "joined", "joinedAt": "2026-05-24" },
+  { "groupId": "hwaseong-cn", "userId": 4, "role": "member", "status": "pending", "joinedAt": "2026-05-28" }
+]
