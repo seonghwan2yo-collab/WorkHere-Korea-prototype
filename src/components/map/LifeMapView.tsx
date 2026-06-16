@@ -116,17 +116,18 @@ export function LifeMapView({ places, activePlace, region, onSelect, onLocate, o
 
   return (
     <StaticMapView
-      imageUrl="/mock/maps/life-map-sample.svg"
+      imageUrl="/mock/maps/ochang-skyview.png"
       alt={`${region} 생활도움 장소 샘플 지도`}
       caption="현재는 정적 지도 이미지에 생활도움 장소를 표시한 MVP 예시 화면입니다."
       label="Life Map MVP"
+      pannable
     >
       <div
         className={`life-map-overlay ${hasSelectedCard ? 'has-selected-card' : ''}`}
         aria-label="생활도움 장소 마커"
         style={{ '--map-overlay-safe-bottom': `${MAP_OVERLAY_SAFE_BOTTOM_PERCENT}%` } as CSSProperties}
       >
-        <div className="life-map-region-chip"><MapPin size={14} />{region} · 원곡동 주변</div>
+        <div className="life-map-region-chip"><MapPin size={14} />{region} · 오창읍 주변</div>
         <button className="life-map-locate-chip" type="button" onClick={onLocate}><Route size={14} />현재 위치</button>
         <div className="life-map-legend" aria-label="현재 필터 결과">
           {categorySummary(places).map((category) => (

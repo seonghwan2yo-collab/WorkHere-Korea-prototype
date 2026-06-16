@@ -1,6 +1,7 @@
 import { UserRound } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
 import { isProfileVerified, profileInitial, type ProfileUser } from './profileUtils'
+import { assetUrl } from '../../utils/assetUrl'
 
 export type ProfileAvatarSize = 'sm' | 'md' | 'lg' | 'xl'
 
@@ -29,14 +30,14 @@ export function ProfileAvatar({ size = 'md', ...user }: ProfileAvatarProps) {
     >
       <span className="profile-avatar-core">
         {hasAvatar ? (
-          <img className="profile-avatar-image" src={user.avatarUrl || undefined} alt="" loading="lazy" decoding="async" onError={() => setImageFailed(true)} />
+          <img className="profile-avatar-image" src={assetUrl(user.avatarUrl)} alt="" loading="lazy" decoding="async" onError={() => setImageFailed(true)} />
         ) : (
           <span className="profile-avatar-initial">{profileInitial(user) || <UserRound size={avatarIconSize(size)} />}</span>
         )}
       </span>
       {verified ? (
         <span className="profile-flag-badge" aria-label={`${user.countryName || '국가'} 인증 배지`}>
-          {user.flagIconUrl ? <img src={user.flagIconUrl} alt="" loading="lazy" decoding="async" /> : <span>{user.flagEmoji || '✓'}</span>}
+          {user.flagIconUrl ? <img src={assetUrl(user.flagIconUrl)} alt="" loading="lazy" decoding="async" /> : <span>{user.flagEmoji || '✓'}</span>}
         </span>
       ) : null}
     </span>

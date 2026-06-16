@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { HomeBanner } from '../../data/homeBanners'
+import { assetUrl } from '../../utils/assetUrl'
 
 type HomeBannerCarouselProps = {
   banners: HomeBanner[]
@@ -80,7 +81,7 @@ export function HomeBannerCarousel({ banners, onOpen }: HomeBannerCarouselProps)
         </span>
         {!failedImages.has(activeBanner.id) ? (
           <img
-            src={activeBanner.imageUrl}
+            src={assetUrl(activeBanner.imageUrl)}
             alt={activeBanner.alt}
             loading={activeIndex === 0 ? 'eager' : 'lazy'}
             decoding="async"

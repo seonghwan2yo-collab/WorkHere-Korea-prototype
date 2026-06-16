@@ -34,6 +34,13 @@ export const fallbackProfileUser: ProfileUser = {
   gradientColors: ['#98A2B3', '#D0D5DD'],
 }
 
+function fallbackAvatarUrl(user?: ProfileUser) {
+  const source = String(user?.id || user?.userId || user?.username || user?.displayName || '1')
+  const sum = Array.from(source).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const avatarId = (sum % 24) + 1
+  return `/mock/avatars/processed/avatar-${String(avatarId).padStart(3, '0')}.webp`
+}
+
 export function isProfileVerified(user?: ProfileUser) {
   return Boolean(user?.isCountryVerified || user?.isVerified || user?.verificationStatus === 'verified')
 }
@@ -67,10 +74,15 @@ export function getSampleUserForName(name?: string, offset = 0) {
 }
 
 export function mergeProfileUser(primary?: ProfileUser, fallback?: ProfileUser): ProfileUser {
-  return {
+  const merged = {
     ...fallbackProfileUser,
     ...fallback,
     ...primary,
     gradientColors: primary?.gradientColors || fallback?.gradientColors || fallbackProfileUser.gradientColors,
+  }
+
+  return {
+    ...merged,
+    avatarUrl: primary?.avatarUrl || fallback?.avatarUrl || fallbackAvatarUrl(merged),
   }
 }

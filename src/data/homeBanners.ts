@@ -54,4 +54,13 @@ export const homeBanners: HomeBanner[] = [
     category: 'community',
     alt: '커뮤니티 안전방 배너',
   },
+  {
+    id: 'jeonbuk-e9-e8-01',
+    title: '전라북도 농업 일자리 모집',
+    subtitle: '전북 농업현장에서 일하는 E-9, E-8 외국인 근로자 커뮤니티입니다.',
+    imageUrl: '/images/home/banners/home-banner-jeonbuk-e9-e8.png',
+    href: '/community?group=jeonbuk-e9-e8',
+    category: 'community',
+    alt: '전라북도 농업 일자리 E-9 E-8 외국인 근로자 모집 배너',
+  },
 ]

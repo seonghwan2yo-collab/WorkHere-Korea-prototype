@@ -79,6 +79,7 @@ import {
   type VisaJobMatch,
   type VisaType,
 } from './utils/visaJobRules'
+import { assetUrl } from './utils/assetUrl'
 import type {
   AdminLog,
   AdminReport,
@@ -317,7 +318,7 @@ const helpTypes: HelpCategoryView[] = rawHelpCategories.map((item) => ({
 const regionOptions = [
   { region1: '경기', region2: '안산', value: '경기 안산' },
   { region1: '경기', region2: '시흥', value: '경기 시흥' },
-  { region1: '충북', region2: '청주', value: '충북 청주' },
+  { region1: '충북', region2: '오창', value: '충북 오창' },
   { region1: '충북', region2: '음성', value: '충북 음성' },
   { region1: '경남', region2: '김해', value: '경남 김해' },
   { region1: '경남', region2: '창원', value: '경남 창원' },
@@ -425,9 +426,10 @@ function App() {
   const [communityToast, setCommunityToast] = useState('')
   const [blockedAuthorIds, setBlockedAuthorIds] = useState<number[]>([])
   const [translatedPostIds, setTranslatedPostIds] = useState<number[]>([])
-  const [placeRegionQuery, setPlaceRegionQuery] = useState('')
+  const [placeRegionQuery, setPlaceRegionQuery] = useState('충북 오창')
   const [placeLanguageFilter, setPlaceLanguageFilter] = useState<'all' | Language>('all')
   const [translatedFeedIds, setTranslatedFeedIds] = useState<number[]>([])
+  const [isBottomNavCompact, setIsBottomNavCompact] = useState(false)
   const [profile, setProfile] = useState<UserProfile>({
     nationality: 'Vietnam',
     region: '경기 안산',
@@ -457,9 +459,10 @@ function App() {
   const filteredJobs = filteredJobsWithMatch.map(({ job }) => job)
   const selectedJobVisaMatch = getVisaJobMatch(selectedJob, selectedJobVisaType)
   const placeRegionKeyword = placeRegionQuery.trim()
+  const placeRegionFilterKeyword = placeRegionKeyword === '충북 오창' ? '충북 청주' : placeRegionKeyword
   const filteredPlaces = approvedPlaces
     .filter((place) => placeFilter === 'all' || place.category === placeFilter)
-    .filter((place) => !placeRegionKeyword || `${place.region} ${place.address}`.includes(placeRegionKeyword))
+    .filter((place) => !placeRegionFilterKeyword || `${place.region} ${place.address}`.includes(placeRegionFilterKeyword))
     .filter((place) => placeLanguageFilter === 'all' || place.languages.includes(placeLanguageFilter))
     .sort((a, b) => (a.distanceKm || 99) - (b.distanceKm || 99))
   const filteredFeeds = filterDailyFeeds(visibleFeeds, dailyFilter, profile)
@@ -490,7 +493,7 @@ function App() {
   const rankedCommunityPosts = rankCommunityFeedPosts(visiblePosts, visibleCommunityGroups, profile, language)
   const publicFeedPosts = filterCommunityFeedPosts(rankedCommunityPosts, selectedCommunityFilterIds, visibleCommunityGroups)
   const recommendedGroups = rankCommunityGroups(visibleCommunityGroups, profile)
-  const featuredCommunityGroups = ['ansan-vn', 'national-safety', 'cheongju-life']
+  const featuredCommunityGroups = ['jeonbuk-e9-e8', 'ansan-vn', 'national-safety']
     .map((groupId) => visibleCommunityGroups.find((group) => group.id === groupId))
     .filter((group): group is CommunityGroup => Boolean(group))
   const communityHomeGroups = featuredCommunityGroups.length ? featuredCommunityGroups : recommendedGroups.slice(0, 3)
@@ -498,6 +501,7 @@ function App() {
   const publishedBanners = banners.filter((banner) => banner.published)
   const publishedNotices = noticeRecords.filter((notice) => notice.published)
   const comments = buildCommentRows(posts, dailyFeeds)
+  const showShell = !['splash', 'language', 'login', 'onboarding'].includes(screen)
   const handleHeaderBack = () => {
     const fallback = getHeaderBackScreen(screen, selectedPost)
     go(fallback)
@@ -520,6 +524,27 @@ function App() {
       document.body.style.overflow = originalOverflow
     }
   }, [isCommunityFilterSheetOpen])
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    })
+  }, [screen, selectedJob.id, selectedPlace.id, selectedPost.id, selectedCommunityGroup.id])
+
+  useEffect(() => {
+    if (!showShell) return undefined
+    let timeoutId: number | undefined
+    const handleScroll = () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+      setIsBottomNavCompact(true)
+      timeoutId = window.setTimeout(() => setIsBottomNavCompact(false), 180)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [showShell])
 
   const dashboard = useMemo(
     () => ({
@@ -636,6 +661,12 @@ function App() {
       return
     }
     if (banner.href.startsWith('/community')) {
+      const groupId = new URLSearchParams(banner.href.split('?')[1] || '').get('group')
+      const group = groupId ? communityGroups.find((item) => item.id === groupId) : undefined
+      if (group) {
+        openCommunityGroup(group)
+        return
+      }
       go('community')
       return
     }
@@ -1126,8 +1157,6 @@ function App() {
     event.currentTarget.reset()
   }
 
-  const showShell = !['splash', 'language', 'login', 'onboarding'].includes(screen)
-
   return (
     <div className={`app-shell lang-${language}`}>
       {showShell ? (
@@ -1198,11 +1227,11 @@ function App() {
             <HomeBannerCarousel banners={homeBanners} onOpen={openHomeBanner} />
             <section className="home-hero">
               <p className="eyebrow">WorkHere Korea</p>
-              <h2>{profile.region} {t.personalizedLife}</h2>
-              <p>{profile.visa} {t.personalizedRule}</p>
+              <h2>충북 음성 맞춤 생활정보</h2>
+              <p>{profile.visa} 비자와 관심정보 기준으로 지역·국적·언어별 콘텐츠를 추천합니다.</p>
               <div className="button-row hero-cta-row">
-                <button className="primary-button" onClick={() => go('daily')} type="button"><Camera size={18} />{t.daily}</button>
-                <button className="secondary-button" onClick={() => go('mypage')} type="button"><UserRound size={18} />{t.myPage}</button>
+                <button className="primary-button" onClick={() => go('daily')} type="button"><Camera size={16} />{t.daily}</button>
+                <button className="secondary-button" onClick={() => go('mypage')} type="button"><UserRound size={16} />내 정보</button>
               </div>
             </section>
             <SectionTitle title={t.quickMenu} />
@@ -1216,7 +1245,7 @@ function App() {
               <Panel title={t.todayKoreaLife}>
                 {publishedBanners.slice(0, 2).map((banner) => (
                   <article className="mini-banner" key={banner.id}>
-                    <img src={banner.image} alt="" loading="lazy" decoding="async" />
+                    <img src={assetUrl(banner.image)} alt="" loading="lazy" decoding="async" />
                     <div><strong>{banner.title}</strong><small>{banner.body}</small></div>
                   </article>
                 ))}
@@ -1245,7 +1274,6 @@ function App() {
 
         {screen === 'daily' && (
           <ScreenFrame title={t.dailyTitle} subtitle={t.dailySubtitle}>
-            <PolicyNotice compact />
             {dailyToast ? <div className="mock-toast daily-toast" role="status"><CheckCircle2 size={18} />{dailyToast}</div> : null}
             <div className="filter-row">
               <select value={dailyFilter} onChange={(event) => setDailyFilter(event.target.value)} aria-label={t.filter}>
@@ -1300,7 +1328,6 @@ function App() {
 
         {screen === 'jobs' && (
           <ScreenFrame title={t.jobList} subtitle={t.infoOnly}>
-            <PolicyNotice compact items={[...commonPolicyNotices, ...jobPolicyNotices]} />
             <section className="job-filter-panel" aria-label="일자리 필터">
               <div className="job-filter-block">
                 <div className="job-filter-title">
@@ -1509,7 +1536,6 @@ function App() {
 
         {screen === 'places' && placeFilter === '__legacy__' && (
           <ScreenFrame title={t.placeMap} subtitle={t.mapReady}>
-            <PolicyNotice compact items={placePolicyNotices} />
             <div className="filter-row">
               <select value={placeFilter} onChange={(event) => setPlaceFilter(event.target.value)} aria-label={t.filter}>
                 <option value="all">{t.filter}: All</option>
@@ -1642,7 +1668,6 @@ function App() {
                 <p>한국어, 영어, 베트남어, 중국어, 우즈베크어 원문 언어를 표시하고, 번역 버튼으로 준비된 번역 또는 준비 중 안내를 보여줍니다.</p>
               </div>
             </section>
-            <PolicyNotice compact items={communityPolicyNotices} />
             <button className="secondary-button stretch subtle-action" onClick={() => setCommunityToast('그룹 만들기는 Phase 2에서 제공됩니다. 지금은 운영자 씨앗 그룹을 이용해주세요.')} type="button"><Plus size={18} />그룹 만들기 준비 중</button>
             <CommunityFilterSheet
               filters={communityIntentFilters}
@@ -1717,7 +1742,6 @@ function App() {
           <DetailFrame title="" back={() => selectedPost.groupId ? go('communityGroupDetail') : go('community')} backLabel={t.back} showBack={false}>
             <CommunityPostDetailView
               post={selectedPost}
-              group={selectedPostGroup}
               board={selectedPostBoard}
               membership={selectedPostMembership}
               previousPost={selectedPostNavigation.previous}
@@ -2018,7 +2042,7 @@ function App() {
           <AdminManage title="피드 관리" back={() => go('admin')}>
             {dailyFeeds.filter((feed) => !feed.deleted).map((feed) => (
               <article className="moderation-card" key={feed.id}>
-                <img className="admin-thumb" src={feed.image} alt="" loading="lazy" decoding="async" />
+                <img className="admin-thumb" src={assetUrl(feed.image)} alt="" loading="lazy" decoding="async" />
                 <div>
                   <div className="card-head"><strong>{feed.author}</strong><span>{feed.nationality}</span><span>{feed.region}</span><mark>{feed.reported} 신고</mark></div>
                   <p>{feed.body}</p>
@@ -2166,7 +2190,7 @@ function App() {
           <AdminManage title="배너 관리" back={() => go('admin')}>
             {banners.map((banner) => (
               <article className="moderation-card" key={banner.id}>
-                <img className="admin-thumb" src={banner.image} alt="" loading="lazy" decoding="async" />
+                <img className="admin-thumb" src={assetUrl(banner.image)} alt="" loading="lazy" decoding="async" />
                 <div>
                   <div className="card-head"><strong>{banner.title}</strong><mark>{banner.published ? '노출' : '비노출'}</mark></div>
                   <p>{banner.body}</p>
@@ -2237,7 +2261,7 @@ function App() {
       </main>
 
       {showShell ? (
-        <nav className="bottom-tabs" aria-label="Bottom tabs">
+        <nav className={isBottomNavCompact ? 'bottom-tabs compact' : 'bottom-tabs'} aria-label="Bottom tabs">
           {mainTabs.map((item) => (
             <TabButton key={item.screen} item={item} active={isTabActive(screen, item.screen)} onClick={() => go(item.screen)} />
           ))}
@@ -2764,7 +2788,8 @@ function LifeMapScreen({
   const [isSheetExpanded, setIsSheetExpanded] = useState(false)
   const [locationNotice, setLocationNotice] = useState('현재 위치를 허용하면 가까운 병원, 약국, 상담기관을 더 쉽게 찾을 수 있습니다.')
   const effectiveRegion = placeRegionQuery || profile.region
-  const regionPlaces = filteredPlaces.filter((place) => `${place.region} ${place.address}`.includes(effectiveRegion))
+  const placeRegionSearchTerm = effectiveRegion === '충북 오창' ? '충북 청주' : effectiveRegion
+  const regionPlaces = filteredPlaces.filter((place) => `${place.region} ${place.address}`.includes(placeRegionSearchTerm))
   const searchedPlaces = regionPlaces.filter((place) => {
     const keyword = mapSearch.trim()
     if (!keyword) return true
@@ -2808,7 +2833,6 @@ function LifeMapScreen({
 
   return (
     <ScreenFrame title="내 주변 생활도움 지도" subtitle="병원, 약국, 상담기관, 송금, 통신 장소를 지역별로 찾아보세요.">
-      <PolicyNotice compact items={placePolicyNotices} />
       <section className="life-map-page">
         <div className="life-map-controls">
           <RegionFilter region={effectiveRegion} onOpen={() => setShowRegionSheet(true)} onLocate={requestLocation} />
@@ -3141,7 +3165,7 @@ export function DailyFeedCard({
 }) {
   return (
     <article className="daily-card">
-      <img src={feed.image} alt={`${feed.author} daily life`} loading="lazy" decoding="async" />
+      <img src={assetUrl(feed.image)} alt={`${feed.author} daily life`} loading="lazy" decoding="async" />
       <div className="daily-body">
         <div className="daily-meta">
           <strong>{feed.author}</strong>
@@ -3240,10 +3264,10 @@ function CommunitySafetyCard({ onHelp, onReport, onSafetyRoom }: { onHelp: () =>
         <h2>도움이 필요할 때 바로 연결하세요.</h2>
         <p>임금체불, 여권 보관, 수수료 요구는 기록하고 안전방 또는 도움요청으로 이어갈 수 있습니다. 긴급 위험은 112/119가 우선입니다.</p>
       </div>
-      <div className="button-row">
-        <button className="primary-button grow" onClick={onSafetyRoom} type="button"><ShieldAlert size={17} />안전방</button>
-        <button className="secondary-button grow" onClick={onHelp} type="button"><HeartHandshake size={17} />도움요청</button>
-        <button className="secondary-button danger compact-action" onClick={onReport} type="button"><Flag size={17} />신고</button>
+      <div className="community-safety-actions">
+        <button className="primary-button community-safety-action" onClick={onSafetyRoom} type="button"><ShieldAlert size={17} /><span>안전방</span></button>
+        <button className="secondary-button community-safety-action" onClick={onHelp} type="button"><HeartHandshake size={17} /><span>도움요청</span></button>
+        <button className="secondary-button danger community-safety-action" onClick={onReport} type="button"><Flag size={17} /><span>신고</span></button>
       </div>
     </section>
   )
@@ -3252,13 +3276,15 @@ function CommunitySafetyCard({ onHelp, onReport, onSafetyRoom }: { onHelp: () =>
 function CommunityGroupCard({ group, membership, onOpen, onJoin }: { group: CommunityGroup; membership?: CommunityMembership; onOpen: () => void; onJoin: () => void }) {
   const joined = membership?.status === 'joined'
   const pending = membership?.status === 'pending'
+  const isVisaVerifiedGroup = group.id === 'jeonbuk-e9-e8'
   return (
     <article className={group.isSafetyFocused ? 'community-group-card safety' : 'community-group-card'}>
       <button className="community-group-cover" onClick={onOpen} type="button">
-        {group.groupImageUrl ? <img src={group.groupImageUrl} alt="" loading="lazy" decoding="async" /> : <span>{countryFlag(group.countryCode)}</span>}
+        {group.groupImageUrl ? <img src={assetUrl(group.groupImageUrl)} alt="" loading="lazy" decoding="async" /> : <span>{countryFlag(group.countryCode)}</span>}
         <div className="community-group-badges">
           {group.isOfficialSeedGroup ? <mark>운영자 추천</mark> : null}
           {group.isSafetyFocused ? <mark className="danger">안전방</mark> : null}
+          {isVisaVerifiedGroup ? <mark>비자 인증</mark> : null}
           {group.joinMode === 'conditional' ? <mark>조건 필요</mark> : null}
         </div>
       </button>
@@ -3294,7 +3320,7 @@ function CommunityGroupRailCard({ group, membership, onOpen }: { group: Communit
   return (
     <button className={group.isSafetyFocused ? 'community-group-rail-card safety' : 'community-group-rail-card'} onClick={onOpen} type="button">
       <span className="community-group-rail-cover">
-        {group.groupImageUrl ? <img src={group.groupImageUrl} alt="" loading="lazy" decoding="async" /> : <span>{countryFlag(group.countryCode)}</span>}
+        {group.groupImageUrl ? <img src={assetUrl(group.groupImageUrl)} alt="" loading="lazy" decoding="async" /> : <span>{countryFlag(group.countryCode)}</span>}
       </span>
       <span className="community-group-rail-copy">
         <strong>{group.name.replace('경기 ', '').replace('전국 ', '')}</strong>
@@ -3443,6 +3469,7 @@ function CommunityGroupFilters({ filters, onChange, groups }: { filters: Record<
 
 function CommunityGroupHero({ group, membership, policy, onJoin, onReport }: { group: CommunityGroup; membership?: CommunityMembership; policy: ReturnType<typeof evaluateCommunityJoinPolicy>; onJoin: () => void; onReport: () => void }) {
   const heroImageUrl = group.backgroundImageUrl || group.groupImageUrl
+  const isVisaVerifiedGroup = group.id === 'jeonbuk-e9-e8'
   const heroClassName = [
     'community-group-hero',
     group.isSafetyFocused ? 'safety' : '',
@@ -3451,11 +3478,12 @@ function CommunityGroupHero({ group, membership, policy, onJoin, onReport }: { g
   ].filter(Boolean).join(' ')
   return (
     <article className={heroClassName}>
-      {heroImageUrl ? <img src={heroImageUrl} alt="" loading="lazy" decoding="async" /> : null}
+      {heroImageUrl ? <img src={assetUrl(heroImageUrl)} alt="" loading="lazy" decoding="async" /> : null}
       <div className="community-group-hero-copy">
         <div className="community-group-badges static">
-          {group.isOfficialSeedGroup ? <mark>공식 씨앗 그룹</mark> : null}
+          {group.isOfficialSeedGroup ? <mark>운영자 추천</mark> : null}
           {group.isSafetyFocused ? <mark className="danger">안전방</mark> : null}
+          {isVisaVerifiedGroup ? <mark>비자 인증</mark> : null}
           <mark>{communityJoinModeLabel[group.joinMode]}</mark>
         </div>
         <h2>{countryFlag(group.countryCode)} {group.name}</h2>
@@ -3533,7 +3561,7 @@ function CommunityPostRow({
           </div>
           {variant === 'album' ? (
             <span className="community-post-thumb">
-              {thumbnailUrl ? <img src={thumbnailUrl} alt={`${post.title} 앨범 이미지`} loading="lazy" decoding="async" /> : <Camera size={22} />}
+              {thumbnailUrl ? <img src={assetUrl(thumbnailUrl)} alt={`${post.title} 앨범 이미지`} loading="lazy" decoding="async" /> : <Camera size={22} />}
             </span>
           ) : null}
         </div>
@@ -3760,7 +3788,6 @@ function FeedHeader({ feed, t, onReport, onHide }: { feed: DailyFeed; t: Record<
 
 function CommunityPostDetailView({
   post,
-  group,
   board,
   membership,
   previousPost,
@@ -3783,7 +3810,6 @@ function CommunityPostDetailView({
   onShare,
 }: {
   post: Post
-  group?: CommunityGroup
   board?: CommunityBoard
   membership?: CommunityMembership
   previousPost?: Post
@@ -3825,10 +3851,6 @@ function CommunityPostDetailView({
 
   return (
     <main className="community-detail-page">
-      <button className="community-detail-back-chip" onClick={onBackToCommunity} type="button">
-        <span>{group?.name || '커뮤니티'}</span>
-      </button>
-
       <article className="community-detail-article">
         <header className="community-detail-header">
           <div className="community-detail-author">
@@ -3849,7 +3871,7 @@ function CommunityPostDetailView({
         {post.images.length ? (
           <div className="community-detail-media" aria-label="첨부 자료">
             {post.images.map((image) => isImageAssetPath(image) ? (
-              <img key={image} src={image} alt={`${post.title} 첨부 이미지`} loading="lazy" decoding="async" />
+              <img key={image} src={assetUrl(image)} alt={`${post.title} 첨부 이미지`} loading="lazy" decoding="async" />
             ) : (
               <span className="community-detail-attachment" key={image}><ImagePlus size={16} />{image}</span>
             ))}
@@ -3909,33 +3931,48 @@ function CommunityPostDetailView({
       </article>
 
       <section className="community-detail-footer-actions" aria-label="커뮤니티 이동">
-        <button className="secondary-button" onClick={onBackToCommunity} type="button">커뮤니티 둘러보기</button>
-        <button className={isJoined ? 'secondary-button joined' : 'primary-button'} onClick={isJoined ? onBackToCommunity : onJoinCommunity} type="button">
-          {isJoined ? '가입됨' : '커뮤니티 가입'}
-        </button>
+        <div>
+          <span className="community-detail-section-kicker">커뮤니티 참여</span>
+          <strong>{isJoined ? '이 커뮤니티에 참여 중입니다' : '이 글이 유용했다면 커뮤니티에 참여해보세요'}</strong>
+        </div>
+        <div className="community-detail-footer-buttons">
+          <button className="community-footer-action ghost" onClick={onBackToCommunity} type="button"><UsersRound size={17} />커뮤니티 둘러보기</button>
+          <button className={isJoined ? 'community-footer-action joined' : 'community-footer-action primary'} onClick={isJoined ? onBackToCommunity : onJoinCommunity} type="button">
+            {isJoined ? <CheckCircle2 size={17} /> : <Plus size={17} />}{isJoined ? '가입됨' : '커뮤니티 가입'}
+          </button>
+        </div>
       </section>
 
       <section className="community-post-navigation" aria-label="이전글 다음글">
-        <button disabled={!previousPost} onClick={() => previousPost ? onOpenPost(previousPost) : undefined} type="button">
-          <span>이전글</span>
+        <button className="community-nav-card prev" disabled={!previousPost} onClick={() => previousPost ? onOpenPost(previousPost) : undefined} type="button">
+          <span><ChevronLeft size={16} />이전글</span>
           <strong>{previousPost?.title || '이전글이 없습니다'}</strong>
+          {previousPost ? <small>{previousPost.category} · 댓글 {previousPost.commentCount || previousPost.comments.length}</small> : null}
         </button>
-        <button disabled={!nextPost} onClick={() => nextPost ? onOpenPost(nextPost) : undefined} type="button">
-          <span>다음글</span>
+        <button className="community-nav-card next" disabled={!nextPost} onClick={() => nextPost ? onOpenPost(nextPost) : undefined} type="button">
+          <span>다음글<ChevronRight size={16} /></span>
           <strong>{nextPost?.title || '다음글이 없습니다'}</strong>
+          {nextPost ? <small>{nextPost.category} · 댓글 {nextPost.commentCount || nextPost.comments.length}</small> : null}
         </button>
       </section>
 
       <section className="popular-community-posts" aria-label="다른 인기 커뮤니티글">
         <div className="popular-community-heading">
-          <h2>다른 인기 커뮤니티글</h2>
+          <div>
+            <span className="community-detail-section-kicker">이어보기</span>
+            <h2>다른 인기 커뮤니티글</h2>
+          </div>
           <span>많이 본 글 3개</span>
         </div>
         <div className="popular-community-list">
           {popularPosts.map((item) => (
             <button key={item.id} onClick={() => onOpenPost(item)} type="button">
-              <strong>{item.title}</strong>
-              <span>{item.category} · 댓글 {item.commentCount || item.comments.length} · 공감 {item.likeCount || 0} · {communityPostTimeLabel(item.id)}</span>
+              <span className="popular-community-rank">{popularPosts.indexOf(item) + 1}</span>
+              <span className="popular-community-copy">
+                <strong>{item.title}</strong>
+                <span>{item.category} · 댓글 {item.commentCount || item.comments.length} · 공감 {item.likeCount || 0} · {communityPostTimeLabel(item.id)}</span>
+              </span>
+              <ChevronRight size={17} />
             </button>
           ))}
         </div>
@@ -4059,7 +4096,7 @@ function FeedCarousel({ feed }: { feed: DailyFeed }) {
           {images.map((image, index) => (
             <div className="feed-slide" key={`${feed.id}-${image.id}`}>
               <img
-                src={image.url}
+                src={assetUrl(image.url)}
                 alt={image.alt || `${feed.author} daily life ${index + 1}`}
                 loading={index === 0 ? 'eager' : 'lazy'}
                 decoding="async"
@@ -4182,10 +4219,10 @@ function ScreenFrame({ title, subtitle, children }: { title: string; subtitle: s
 
 function DetailFrame({
   title,
-  back,
-  backLabel,
   children,
-  showBack = true,
+  back: _back,
+  backLabel: _backLabel,
+  showBack: _showBack = true,
 }: {
   title: string
   back: () => void
@@ -4195,7 +4232,6 @@ function DetailFrame({
 }) {
   return (
     <section className={title ? 'screen-frame' : 'screen-frame compact-detail-frame'}>
-      {showBack ? <button className="back-button" onClick={back} type="button"><ChevronLeft size={18} />{backLabel}</button> : null}
       {title ? <div className="screen-header"><h1>{title}</h1></div> : null}
       {children}
     </section>
