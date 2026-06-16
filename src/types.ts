@@ -21,6 +21,7 @@ export type Screen =
   | 'postDetail'
   | 'postCreate'
   | 'help'
+  | 'notifications'
   | 'mypage'
   | 'admin'
   | 'adminUsers'

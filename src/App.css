@@ -389,6 +389,22 @@ textarea {
   padding: 0;
 }
 
+.notification-button {
+  position: relative;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12);
+}
+
 .icon-button.help-action {
   color: var(--color-primary);
   background: #eef9f6;
@@ -939,6 +955,109 @@ textarea {
   padding-bottom: 96px;
 }
 
+.notification-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid rgba(11, 74, 139, 0.12);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--shadow-card);
+}
+
+.notification-summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.notification-summary strong {
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.notification-summary span {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.notification-list {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 96px;
+}
+
+.notification-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(11, 74, 139, 0.1);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-card);
+}
+
+.notification-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  background: rgba(231, 243, 255, 0.86);
+}
+
+.notification-card.community .notification-icon,
+.notification-card.daily .notification-icon {
+  color: #0f766e;
+  background: rgba(204, 251, 241, 0.72);
+}
+
+.notification-card.job .notification-icon,
+.notification-card.notice .notification-icon {
+  color: #0b4a8b;
+  background: rgba(219, 234, 254, 0.84);
+}
+
+.notification-card.help .notification-icon {
+  color: #b42318;
+  background: rgba(255, 240, 238, 0.9);
+}
+
+.notification-card.place .notification-icon {
+  color: #166534;
+  background: rgba(220, 252, 231, 0.86);
+}
+
+.notification-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.notification-meta {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.notification-copy strong {
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.36;
+}
+
+.notification-copy p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.42;
+}
+
 .floating-action-button {
   position: fixed;
   right: 18px;
@@ -1055,8 +1174,13 @@ textarea {
   background: var(--color-card);
   color: var(--color-text);
   display: grid;
-  place-items: center;
-  gap: 6px;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+}
+
+.quick-button svg {
+  transform: translateY(4px);
 }
 
 .quick-button:hover,

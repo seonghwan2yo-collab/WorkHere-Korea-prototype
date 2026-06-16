@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   AlertTriangle,
@@ -465,7 +465,7 @@ function App() {
     .filter((place) => !placeRegionFilterKeyword || `${place.region} ${place.address}`.includes(placeRegionFilterKeyword))
     .filter((place) => placeLanguageFilter === 'all' || place.languages.includes(placeLanguageFilter))
     .sort((a, b) => (a.distanceKm || 99) - (b.distanceKm || 99))
-  const filteredFeeds = filterDailyFeeds(visibleFeeds, dailyFilter, profile)
+  const filteredFeeds = filterDailyFeeds(visibleFeeds, dailyFilter, profile, currentUserId)
   const filteredCommunityGroups = filterCommunityGroups(visibleCommunityGroups, communityFilters)
   const selectedGroupBoards = communityBoards
     .filter((board) => board.groupId === 'common' || board.groupId === selectedCommunityGroup.id)
@@ -1278,13 +1278,13 @@ function App() {
             <div className="filter-row">
               <select value={dailyFilter} onChange={(event) => setDailyFilter(event.target.value)} aria-label={t.filter}>
                 <option value="all">{t.all}</option>
+                <option value="mine">내 피드 보기</option>
                 <option value="nearby">{t.nearby}</option>
                 <option value="nationality">{t.myNationality}</option>
                 <option value="region">{t.myRegion}</option>
                 <option value="popular">{t.popular}</option>
               </select>
             </div>
-            <InfoBox icon={<ShieldCheck size={18} />} text={t.privacyNotice} />
             <div className="daily-feed-list">
               {filteredFeeds.map((feed) => (
                 <DailyFeedCardV2
@@ -1928,6 +1928,80 @@ function App() {
           </ScreenFrame>
         )}
 
+        {screen === 'notifications' && (
+          <ScreenFrame title="알림" subtitle="내 일상, 일자리, 커뮤니티, 도움요청 활동을 모아봅니다.">
+            <section className="notification-summary">
+              <div>
+                <strong>오늘 확인할 알림</strong>
+                <span>읽지 않은 활동 4개 · 처리 진행 2건</span>
+              </div>
+              <button className="secondary-button small" onClick={() => trackEvent('feed_viewed', 'notifications', 'mark_all_read')} type="button">모두 읽음</button>
+            </section>
+            <div className="notification-list">
+              <NotificationActivity
+                icon={<MessageCircle size={18} />}
+                tone="community"
+                title="전라북도 E-9·E-8 농업 근로자 커뮤니티에 새 댓글이 달렸습니다."
+                body="E-8 계절근로 계약 기간 확인 질문에 계약서 확인 항목 댓글 2개가 추가됐습니다."
+                meta="커뮤니티 · 방금 전"
+                actionLabel="댓글 보기"
+                onOpen={() => {
+                  const group = communityGroups.find((item) => item.id === 'jeonbuk-e9-e8')
+                  if (group) openCommunityGroup(group)
+                }}
+              />
+              <NotificationActivity
+                icon={<BriefcaseBusiness size={18} />}
+                tone="job"
+                title="내 비자 조건에 맞는 새 일자리 3건이 등록됐습니다."
+                body={`${profile.visa} 기준으로 충북 음성, 전북 농업현장, 경남 김해 공고가 추천 목록에 추가됐습니다.`}
+                meta="일자리 · 12분 전"
+                actionLabel="일자리 보기"
+                onOpen={() => go('jobs')}
+              />
+              <NotificationActivity
+                icon={<Heart size={18} />}
+                tone="daily"
+                title="내 일상 피드에 좋아요와 댓글 반응이 생겼습니다."
+                body="Tuan Nguyen님의 농장 출근길 피드에 좋아요 6개와 댓글 1개가 기록됐습니다."
+                meta="일상 · 28분 전"
+                actionLabel="내 피드 보기"
+                onOpen={() => {
+                  setDailyFilter('mine')
+                  go('daily')
+                }}
+              />
+              <NotificationActivity
+                icon={<ShieldCheck size={18} />}
+                tone="help"
+                title="도움요청 접수 건이 상담기관 안내 단계로 변경됐습니다."
+                body="임금·계약 관련 문의에 가까운 외국인근로자 지원기관 안내가 연결됐습니다."
+                meta="도움요청 · 오늘 09:40"
+                actionLabel="도움요청 보기"
+                onOpen={() => go('help')}
+              />
+              <NotificationActivity
+                icon={<MapPin size={18} />}
+                tone="place"
+                title="저장한 장소 근처에 다국어 상담 가능 기관이 추가됐습니다."
+                body="경기 안산 생활지도에 한국어, English, Tiếng Việt 지원 장소가 업데이트됐습니다."
+                meta="생활지도 · 어제"
+                actionLabel="지도 보기"
+                onOpen={() => go('places')}
+              />
+              <NotificationActivity
+                icon={<Bell size={18} />}
+                tone="notice"
+                title="이번 주 공지: 급여명세서와 근무시간 기록을 확인하세요."
+                body="월급일 전후로 시급, 공제 항목, 숙식비 차감 내역을 사진으로 보관하면 도움이 됩니다."
+                meta="공지 · 2일 전"
+                actionLabel="홈에서 보기"
+                onOpen={() => go('home')}
+              />
+            </div>
+          </ScreenFrame>
+        )}
+
         {screen === 'admin' && (
           <ScreenFrame title="관리자 대시보드" subtitle="사용자 생성 콘텐츠와 신고/검수 프로세스를 운영합니다.">
             <div className="admin-stat-grid">
@@ -2271,7 +2345,8 @@ function App() {
   )
 }
 
-function filterDailyFeeds(feeds: DailyFeed[], filter: string, profile: UserProfile) {
+function filterDailyFeeds(feeds: DailyFeed[], filter: string, profile: UserProfile, currentUserId: number) {
+  if (filter === 'mine') return feeds.filter((feed) => feed.authorId === currentUserId)
   if (filter === 'nationality') return feeds.filter((feed) => feed.nationality === profile.nationality)
   if (filter === 'region' || filter === 'nearby') return feeds.filter((feed) => feed.region.includes(profile.region.split(' ').at(-1) || profile.region))
   if (filter === 'popular') return [...feeds].sort((a, b) => b.likes - a.likes)
@@ -2433,6 +2508,7 @@ function getHeaderBackScreen(screen: Screen, selectedPost?: Post): Screen {
     postDetail: selectedPost?.groupId ? 'communityGroupDetail' : 'community',
     postCreate: 'communityGroupDetail',
     help: 'home',
+    notifications: 'home',
     mypage: 'home',
     admin: 'home',
     adminUsers: 'admin',
@@ -2468,6 +2544,7 @@ function getHeaderContextLabel(screen: Screen) {
     postDetail: '커뮤니티',
     postCreate: '글쓰기',
     help: '도움요청',
+    notifications: '알림',
     mypage: '마이페이지',
     admin: '관리자',
   }
@@ -2564,7 +2641,10 @@ function Topbar({
           </button>
         )}
         <div className="topbar-actions" aria-label="빠른 메뉴">
-          <button className="icon-button" type="button" title={t.notifications} aria-label={t.notifications}><Bell size={18} /></button>
+          <button className="icon-button notification-button has-unread" onClick={() => go('notifications')} type="button" title={t.notifications} aria-label={`${t.notifications} 읽지 않은 알림 있음`}>
+            <Bell size={18} />
+            <span className="notification-dot" aria-hidden="true" />
+          </button>
           <button className="icon-button" onClick={() => go('mypage')} type="button" title={t.myPage} aria-label={t.myPage}><UserRound size={18} /></button>
           <button className="icon-button help-action" onClick={() => go('help')} type="button" title="도움요청" aria-label="도움요청"><HeartHandshake size={19} /></button>
           <select className="language-select" value={language} onChange={(event) => setLanguage(event.target.value as Language)} aria-label={t.selectLanguage}>
@@ -3270,6 +3350,36 @@ function CommunitySafetyCard({ onHelp, onReport, onSafetyRoom }: { onHelp: () =>
         <button className="secondary-button danger community-safety-action" onClick={onReport} type="button"><Flag size={17} /><span>신고</span></button>
       </div>
     </section>
+  )
+}
+
+function NotificationActivity({
+  icon,
+  tone,
+  title,
+  body,
+  meta,
+  actionLabel,
+  onOpen,
+}: {
+  icon: ReactNode
+  tone: 'community' | 'job' | 'daily' | 'help' | 'place' | 'notice'
+  title: string
+  body: string
+  meta: string
+  actionLabel: string
+  onOpen: () => void
+}) {
+  return (
+    <article className={`notification-card ${tone}`}>
+      <span className="notification-icon">{icon}</span>
+      <div className="notification-copy">
+        <div className="notification-meta">{meta}</div>
+        <strong>{title}</strong>
+        <p>{body}</p>
+      </div>
+      <button className="secondary-button small" onClick={onOpen} type="button">{actionLabel}</button>
+    </article>
   )
 }
 
