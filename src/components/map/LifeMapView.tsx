@@ -133,6 +133,7 @@ export function LifeMapView({ places, activePlace, region, onSelect, onLocate, o
           {categorySummary(places).map((category) => (
             <span className={`life-map-legend-chip ${category.markerClass}`} key={category.id}>{category.label} {category.count}곳</span>
           ))}
+          <span className="life-map-legend-chip friendly">지원 외국인 친화</span>
         </div>
         {!hasSelectedCard ? (
           <div className={`life-map-summary-bar ${places.length === 0 ? 'empty' : ''}`} aria-live="polite">
@@ -158,7 +159,7 @@ export function LifeMapView({ places, activePlace, region, onSelect, onLocate, o
               type="button"
             >
               <Icon size={18} />
-              {friendly ? <b className="life-map-marker-badge" aria-label="외국인 친화 장소">외</b> : null}
+              {friendly ? <b className="life-map-marker-badge" aria-label="외국인 친화 장소">지원</b> : null}
               <span>{place.name}</span>
             </button>
           )

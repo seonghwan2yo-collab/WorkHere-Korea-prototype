@@ -28,6 +28,7 @@ import {
   Map,
   MapPin,
   MessageCircle,
+  Moon,
   MoreHorizontal,
   Pill,
   PhoneCall,
@@ -39,6 +40,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShoppingBag,
+  Sun,
   Trash2,
   UserRound,
   UserX,
@@ -116,6 +118,8 @@ import type {
 } from './types'
 import './App.css'
 
+type AppIcon = (props: { size?: number; className?: string }) => ReactNode
+
 const statusLabel = {
   approved: '승인됨',
   pending: '관리자 승인 대기',
@@ -185,6 +189,7 @@ type HelpCategoryView = Omit<HelpCategory, 'icon'> & { icon: typeof HeartHandsha
 const dailyCategories: DailyCategory[] = ['회사생활', '한국생활', '음식', '쉬는날', '숙소생활', '질문', '자랑/축하', '조심하세요']
 const dangerWords = ['임금체불', '사기', '폭행', '여권 보관', '여권보관']
 const lifeMapCategories = ['병원', '약국', '상담기관', '송금/은행', '통신/유심', '음식점/마트', '행정기관', '안전/산재', '종교/커뮤니티']
+const defaultPlaceFilters = ['병원', '약국', '상담기관', '송금/은행', '행정기관']
 const fallbackHelpTypes = [
   {
     id: 'wage',
@@ -382,6 +387,7 @@ const initialBugReports: BugReport[] = [
 
 function App() {
   const [language, setLanguage] = useState<Language>(() => (localStorage.getItem('workhere-language') as Language) || 'ko')
+  const [isDarkMode, setIsDarkMode] = useState(true)
   const [screen, setScreen] = useState<Screen>('splash')
   const [users, setUsers] = useState<User[]>(seedUsers)
   const [jobs, setJobs] = useState<Job[]>(seedJobs)
@@ -411,7 +417,7 @@ function App() {
   const [selectedJobRegionCodes, setSelectedJobRegionCodes] = useState<string[]>([])
   const [selectedJobVisaTypes, setSelectedJobVisaTypes] = useState<VisaType[]>(['E-9'])
   const [showRestrictedJobs, setShowRestrictedJobs] = useState(false)
-  const [placeFilter, setPlaceFilter] = useState('all')
+  const [placeFilters, setPlaceFilters] = useState<string[]>(defaultPlaceFilters)
   const [communityFilters, setCommunityFilters] = useState({
     region: 'all',
     country: 'all',
@@ -461,7 +467,7 @@ function App() {
   const placeRegionKeyword = placeRegionQuery.trim()
   const placeRegionFilterKeyword = placeRegionKeyword === '충북 오창' ? '충북 청주' : placeRegionKeyword
   const filteredPlaces = approvedPlaces
-    .filter((place) => placeFilter === 'all' || place.category === placeFilter)
+    .filter((place) => placeFilters.includes(place.category))
     .filter((place) => !placeRegionFilterKeyword || `${place.region} ${place.address}`.includes(placeRegionFilterKeyword))
     .filter((place) => placeLanguageFilter === 'all' || place.languages.includes(placeLanguageFilter))
     .sort((a, b) => (a.distanceKm || 99) - (b.distanceKm || 99))
@@ -508,6 +514,12 @@ function App() {
   }
 
   useEffect(() => {
+    const theme = isDarkMode ? 'dark' : 'light'
+    localStorage.setItem('workhere-theme', theme)
+    document.documentElement.dataset.theme = theme
+  }, [isDarkMode])
+
+  useEffect(() => {
     if (!isDailyComposerOpen) return undefined
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -529,7 +541,7 @@ function App() {
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     })
-  }, [screen, selectedJob.id, selectedPlace.id, selectedPost.id, selectedCommunityGroup.id])
+  }, [screen])
 
   useEffect(() => {
     if (!showShell) return undefined
@@ -632,18 +644,18 @@ function App() {
     const nextKeyword = keyword.trim()
     trackEvent('search_performed', screen, nextKeyword)
     if (nextKeyword.includes('병원') || nextKeyword.includes('상담') || nextKeyword.includes('산재')) {
-      setPlaceFilter(nextKeyword.includes('상담') ? '상담기관' : nextKeyword.includes('산재') ? '안전/산재' : '병원')
+      setPlaceFilters([nextKeyword.includes('상담') ? '상담기관' : nextKeyword.includes('산재') ? '안전/산재' : '병원'])
       go('places')
       return
     }
     if (nextKeyword.includes('병원')) {
-      setPlaceFilter('병원')
+      setPlaceFilters(['병원'])
       go('places')
     }
   }
 
   const openLifeMap = (category = 'all', region = profile.region) => {
-    setPlaceFilter(category)
+    setPlaceFilters(category === 'all' ? [...defaultPlaceFilters] : [category])
     setPlaceRegionQuery(region)
     go('places')
   }
@@ -1158,7 +1170,7 @@ function App() {
   }
 
   return (
-    <div className={`app-shell lang-${language}`}>
+    <div className={`app-shell lang-${language} ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
       {showShell ? (
         <aside className="desktop-rail" aria-label="Desktop navigation">
           <button className="brand" onClick={() => go('home')} type="button">
@@ -1239,7 +1251,7 @@ function App() {
               <QuickButton icon={BriefcaseBusiness} label={t.jobs} onClick={() => go('jobs')} />
               <QuickButton icon={Map} label={t.placeMap} onClick={() => go('places')} />
               <QuickButton icon={Calculator} label={t.salary} onClick={() => go('salary')} />
-              <QuickButton icon={CircleHelp} label={t.help} onClick={() => go('help')} />
+              <QuickButton icon={HelpRequestIcon} label={t.help} onClick={() => go('help')} />
             </div>
             <div className="split-grid">
               <Panel title={t.todayKoreaLife}>
@@ -1519,8 +1531,8 @@ function App() {
           <LifeMapScreen
             t={t}
             profile={profile}
-            placeFilter={placeFilter}
-            setPlaceFilter={setPlaceFilter}
+            placeFilters={placeFilters}
+            setPlaceFilters={setPlaceFilters}
             placeRegionQuery={placeRegionQuery}
             setPlaceRegionQuery={setPlaceRegionQuery}
             placeLanguageFilter={placeLanguageFilter}
@@ -1534,10 +1546,10 @@ function App() {
           />
         )}
 
-        {screen === 'places' && placeFilter === '__legacy__' && (
+        {screen === 'places' && placeFilters.includes('__legacy__') && (
           <ScreenFrame title={t.placeMap} subtitle={t.mapReady}>
             <div className="filter-row">
-              <select value={placeFilter} onChange={(event) => setPlaceFilter(event.target.value)} aria-label={t.filter}>
+              <select value={placeFilters[0] || 'all'} onChange={(event) => setPlaceFilters([event.target.value])} aria-label={t.filter}>
                 <option value="all">{t.filter}: All</option>
                 <option value="상담">상담</option>
                 <option value="병원">병원</option>
@@ -1906,6 +1918,18 @@ function App() {
         {screen === 'mypage' && (
           <ScreenFrame title={t.myPage} subtitle={`${profile.nationality} · ${profile.region} · ${profile.visa}`}>
             <div className="split-grid">
+              <Panel title="화면 설정">
+                <button className="theme-toggle-card" onClick={() => setIsDarkMode((value) => !value)} type="button" aria-pressed={isDarkMode}>
+                  <span className="theme-toggle-icon">{isDarkMode ? <Moon size={20} /> : <Sun size={20} />}</span>
+                  <span className="theme-toggle-copy">
+                    <strong>다크모드</strong>
+                    <small>{isDarkMode ? '어두운 화면으로 보고 있습니다.' : '밝은 화면으로 보고 있습니다.'}</small>
+                  </span>
+                  <span className={isDarkMode ? 'theme-switch on' : 'theme-switch'} aria-hidden="true">
+                    <span />
+                  </span>
+                </button>
+              </Panel>
               <Panel title={t.profile}>
                 <MyProfileSummary profile={profile} language={language} />
                 <InfoLine icon={<UserRound size={16} />} text={profile.interests.join(', ')} />
@@ -2646,7 +2670,7 @@ function Topbar({
             <span className="notification-dot" aria-hidden="true" />
           </button>
           <button className="icon-button" onClick={() => go('mypage')} type="button" title={t.myPage} aria-label={t.myPage}><UserRound size={18} /></button>
-          <button className="icon-button help-action" onClick={() => go('help')} type="button" title="도움요청" aria-label="도움요청"><HeartHandshake size={19} /></button>
+          <button className="icon-button help-action" onClick={() => go('help')} type="button" title="도움요청" aria-label="도움요청"><HelpRequestIcon size={21} /></button>
           <select className="language-select" value={language} onChange={(event) => setLanguage(event.target.value as Language)} aria-label={t.selectLanguage}>
             {languages.map((item) => <option key={item.code} value={item.code}>{item.native}</option>)}
           </select>
@@ -2671,7 +2695,7 @@ function HeroSection({ t, onStart }: { t: Record<string, string>; onStart: () =>
   const features = [
     { icon: Camera, label: 'Daily life', tone: 'mint', position: 'top' },
     { icon: MapPin, label: 'Life map', tone: 'blue', position: 'middle' },
-    { icon: HeartHandshake, label: 'Help record', tone: 'navy', position: 'bottom' },
+    { icon: HelpRequestIcon, label: 'Help record', tone: 'navy', position: 'bottom' },
   ]
 
   return (
@@ -2704,7 +2728,7 @@ function HeroFeatureList({
   features,
   onFeatureClick,
 }: {
-  features: Array<{ icon: typeof Camera; label: string; tone: string; position: string }>
+  features: Array<{ icon: AppIcon; label: string; tone: string; position: string }>
   onFeatureClick: () => void
 }) {
   return (
@@ -2723,7 +2747,7 @@ function HeroFeaturePoint({
   position,
   onClick,
 }: {
-  icon: typeof Camera
+  icon: AppIcon
   label: string
   tone: string
   position: string
@@ -2835,8 +2859,8 @@ function AnalyticsPanel({ events }: { events: AnalyticsEvent[] }) {
 function LifeMapScreen({
   t,
   profile,
-  placeFilter,
-  setPlaceFilter,
+  placeFilters,
+  setPlaceFilters,
   placeRegionQuery,
   setPlaceRegionQuery,
   placeLanguageFilter,
@@ -2849,8 +2873,8 @@ function LifeMapScreen({
 }: {
   t: Record<string, string>
   profile: UserProfile
-  placeFilter: string
-  setPlaceFilter: (value: string) => void
+  placeFilters: string[]
+  setPlaceFilters: (value: string[] | ((current: string[]) => string[])) => void
   placeRegionQuery: string
   setPlaceRegionQuery: (value: string) => void
   placeLanguageFilter: 'all' | Language
@@ -2865,6 +2889,7 @@ function LifeMapScreen({
   const [activePlace, setActivePlace] = useState<Place | undefined>(undefined)
   const [mapSearch, setMapSearch] = useState('')
   const [showRegionSheet, setShowRegionSheet] = useState(false)
+  const [showLocationPermission, setShowLocationPermission] = useState(false)
   const [isSheetExpanded, setIsSheetExpanded] = useState(false)
   const [locationNotice, setLocationNotice] = useState('현재 위치를 허용하면 가까운 병원, 약국, 상담기관을 더 쉽게 찾을 수 있습니다.')
   const effectiveRegion = placeRegionQuery || profile.region
@@ -2878,25 +2903,28 @@ function LifeMapScreen({
   const currentActivePlace = activePlace && searchedPlaces.some((place) => place.id === activePlace.id)
     ? activePlace
     : undefined
-  const resultLabel = `${placeFilter === 'all' ? '전체' : placeFilter} ${searchedPlaces.length}곳`
+  const selectedFilterLabel = placeFilters.length === 0
+    ? '선택 없음'
+    : placeFilters.length === 1
+      ? placeFilters[0]
+      : `${placeFilters.length}개 유형`
+  const resultLabel = `${selectedFilterLabel} ${searchedPlaces.length}곳`
 
   const requestLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationNotice('이 기기에서는 위치 기능을 사용할 수 없어 선택한 지역 기준으로 장소를 보여드립니다.')
-      setPlaceRegionQuery(profile.region)
+    setShowLocationPermission(true)
+  }
+
+  const applyLocationPermission = (mode: 'whileUsing' | 'once' | 'denied') => {
+    setShowLocationPermission(false)
+    if (mode === 'denied') {
+      setLocationNotice('위치 권한이 없어 선택한 지역 기준으로 장소를 보여드립니다.')
       return
     }
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        setLocationNotice('현재 위치 기준으로 주변 생활도움 장소를 보여드립니다.')
-        setPlaceRegionQuery(profile.region)
-      },
-      () => {
-        setLocationNotice('위치 권한이 없어 선택한 지역 기준으로 장소를 보여드립니다.')
-        setPlaceRegionQuery(profile.region)
-      },
-      { enableHighAccuracy: false, timeout: 5000 },
-    )
+    setPlaceRegionQuery(profile.region)
+    setActivePlace(undefined)
+    setLocationNotice(mode === 'whileUsing'
+      ? '앱을 사용하는 동안 현재 위치 기준으로 주변 장소를 보여드립니다.'
+      : '이번 한 번만 현재 위치 기준으로 주변 장소를 보여드립니다.')
   }
 
   const selectPlace = (place: Place) => {
@@ -2924,7 +2952,10 @@ function LifeMapScreen({
         </div>
         <InfoLine icon={<CircleHelp size={16} />} text={locationNotice} />
       </section>
-      <CategoryTabs selected={placeFilter} resultLabel={resultLabel} onSelect={(value) => { setPlaceFilter(value); setActivePlace(undefined) }} />
+      <CategoryTabs selected={placeFilters} resultLabel={resultLabel} onSelect={(value) => {
+        setPlaceFilters((current) => togglePlaceFilter(current, value))
+        setActivePlace(undefined)
+      }} />
       <div className="life-map-workspace">
         <MapPanel
           places={searchedPlaces}
@@ -2955,6 +2986,7 @@ function LifeMapScreen({
         />
       ) : null}
       {showRegionSheet ? <RegionSheet current={effectiveRegion} onSelect={selectRegion} onClose={() => setShowRegionSheet(false)} /> : null}
+      {showLocationPermission ? <LocationPermissionModal onSelect={applyLocationPermission} onClose={() => setShowLocationPermission(false)} /> : null}
       <form className="form-card life-map-report-form" onSubmit={onSubmitPlace}>
         <h2>신규 장소 제보</h2>
         <p className="empty-text">사용자가 제보한 장소는 관리자 검수 후 지도에 노출됩니다.</p>
@@ -2985,8 +3017,19 @@ function RegionFilter({ region, onOpen, onLocate }: { region: string; onOpen: ()
   )
 }
 
-function CategoryTabs({ selected, resultLabel, onSelect }: { selected: string; resultLabel: string; onSelect: (value: string) => void }) {
+function togglePlaceFilter(current: string[], value: string) {
+  if (value === 'all') {
+    return current.length === lifeMapCategories.length ? [] : [...lifeMapCategories]
+  }
+  if (current.includes(value)) {
+    return current.filter((item) => item !== value)
+  }
+  return [...current, value]
+}
+
+function CategoryTabs({ selected, resultLabel, onSelect }: { selected: string[]; resultLabel: string; onSelect: (value: string) => void }) {
   const tabs = ['all', ...lifeMapCategories]
+  const allSelected = selected.length === lifeMapCategories.length
   return (
     <section className="category-tabs" aria-label="장소 유형 필터">
       <div className="category-tabs-header">
@@ -2995,9 +3038,9 @@ function CategoryTabs({ selected, resultLabel, onSelect }: { selected: string; r
       </div>
       <div className="category-chip-scroll">
         {tabs.map((tab) => {
-          const active = selected === tab
+          const active = tab === 'all' ? allSelected : selected.includes(tab)
           return (
-            <button className={`category-chip ${active ? 'active' : ''}`} key={tab} type="button" onClick={() => onSelect(tab)}>
+            <button className={`category-chip ${active ? 'active' : ''}`} key={tab} type="button" onClick={() => onSelect(tab)} aria-pressed={active}>
               {tab === 'all' ? '전체' : tab}
             </button>
           )
@@ -3118,6 +3161,7 @@ function PlaceCard({ place, active, onSelect, onDetail, onSave, t }: { place: Pl
 }
 
 function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect: (region: string) => void; onClose: () => void }) {
+  const currentRegion = regionOptions.find((region) => region.value === current)
   return (
     <div className="region-sheet-backdrop" role="presentation" onClick={onClose}>
       <section className="region-sheet" role="dialog" aria-modal="true" aria-label="지역 선택" onClick={(event) => event.stopPropagation()}>
@@ -3125,16 +3169,42 @@ function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect
           <div>
             <p className="eyebrow">지역 필터</p>
             <h3>어느 지역의 도움 장소를 볼까요?</h3>
+            <p className="region-sheet-copy">지역을 선택하면 지도 마커와 장소 목록이 해당 권역 기준으로 바뀝니다.</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="닫기">×</button>
+        </div>
+        <div className="region-sheet-preview">
+          <MapPin size={17} />
+          <div>
+            <strong>{currentRegion ? `${currentRegion.region1} ${currentRegion.region2}` : current}</strong>
+            <span>병원, 약국, 상담기관, 송금, 행정기관을 먼저 보여줍니다.</span>
+          </div>
         </div>
         <div className="region-grid">
           {regionOptions.map((region) => (
             <button className={`region-option ${current === region.value ? 'active' : ''}`} key={region.value} type="button" onClick={() => onSelect(region.value)}>
               <span>{region.region1}</span>
               <strong>{region.region2}</strong>
+              <small>{region.value === '충북 오창' ? '오창읍 주변 샘플 지도' : '지역 기준 장소 보기'}</small>
             </button>
           ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function LocationPermissionModal({ onSelect, onClose }: { onSelect: (mode: 'whileUsing' | 'once' | 'denied') => void; onClose: () => void }) {
+  return (
+    <div className="location-permission-backdrop" role="presentation" onClick={onClose}>
+      <section className="location-permission-modal" role="dialog" aria-modal="true" aria-label="위치 권한 선택" onClick={(event) => event.stopPropagation()}>
+        <div className="location-permission-icon"><MapPin size={24} /></div>
+        <h3>WorkHere Korea에서 현재 위치를 사용하도록 허용할까요?</h3>
+        <p>가까운 병원, 약국, 상담기관과 행정기관을 현재 위치 기준으로 보여드립니다.</p>
+        <div className="location-permission-actions">
+          <button className="primary-button" type="button" onClick={() => onSelect('whileUsing')}>앱을 사용하는 동안 허용</button>
+          <button className="secondary-button" type="button" onClick={() => onSelect('once')}>한 번 허용</button>
+          <button className="ghost-button" type="button" onClick={() => onSelect('denied')}>허용 안 함</button>
         </div>
       </section>
     </div>
@@ -3346,7 +3416,7 @@ function CommunitySafetyCard({ onHelp, onReport, onSafetyRoom }: { onHelp: () =>
       </div>
       <div className="community-safety-actions">
         <button className="primary-button community-safety-action" onClick={onSafetyRoom} type="button"><ShieldAlert size={17} /><span>안전방</span></button>
-        <button className="secondary-button community-safety-action" onClick={onHelp} type="button"><HeartHandshake size={17} /><span>도움요청</span></button>
+        <button className="secondary-button community-safety-action" onClick={onHelp} type="button"><HelpRequestIcon size={18} /><span>도움요청</span></button>
         <button className="secondary-button danger community-safety-action" onClick={onReport} type="button"><Flag size={17} /><span>신고</span></button>
       </div>
     </section>
@@ -4356,7 +4426,38 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   return <section className="panel"><h2>{title}</h2>{children}</section>
 }
 
-function QuickButton({ icon: Icon, label, onClick }: { icon: typeof Home; label: string; onClick: () => void }) {
+function HelpRequestIcon({ size = 22, className = '' }: { size?: number; className?: string }) {
+  const iconClassName = ['help-request-icon', className].filter(Boolean).join(' ')
+  const width = Math.round(size * 1.34)
+
+  return (
+    <svg className={iconClassName} width={width} height={size} viewBox="0 0 64 48" fill="none" aria-hidden="true" focusable="false">
+      <path
+        d="M9.5 4.8h45c4 0 7.2 3.2 7.2 7.2v18.2c0 4-3.2 7.2-7.2 7.2H35.4l-8.8 7.6c-1.5 1.3-3.8.3-3.8-1.7v-5.9H9.5c-4 0-7.2-3.2-7.2-7.2V12c0-4 3.2-7.2 7.2-7.2Z"
+        fill="currentColor"
+        opacity="0.14"
+        stroke="currentColor"
+        strokeWidth="3.6"
+        strokeLinejoin="round"
+      />
+      <text
+        x="32"
+        y="25.8"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fill="currentColor"
+        fontFamily="Arial, Helvetica, sans-serif"
+        fontSize="15"
+        fontWeight="900"
+        letterSpacing="0.8"
+      >
+        HELP
+      </text>
+    </svg>
+  )
+}
+
+function QuickButton({ icon: Icon, label, onClick }: { icon: AppIcon; label: string; onClick: () => void }) {
   return <button className="quick-button" onClick={onClick} type="button"><Icon size={22} /><span>{label}</span></button>
 }
 

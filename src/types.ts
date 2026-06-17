@@ -133,6 +133,8 @@ export type Place = {
   reviews: string[]
   lat: number
   lng: number
+  mapX?: number
+  mapY?: number
   source: 'operator' | 'user'
   approvalStatus: ApprovalStatus
   saved?: boolean

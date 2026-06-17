@@ -269,7 +269,34 @@ export const places: Place[] = rawPlaces.map((place, index) => ({
     `${lifeMapCategories[index % lifeMapCategories.length]} 이용 안내가 도움이 됐어요.`,
     index % 5 === 0 ? '처음 방문해도 접수 방법을 천천히 알려줬어요.' : '전화로 운영시간을 확인하고 방문하는 것이 좋아요.',
   ],
-}))
+})).concat({
+  id: 101,
+  name: '오창 외국인 노동상담센터',
+  category: '상담기관',
+  region: '충북 청주',
+  address: '충북 청주시 청원구 오창읍 중심상업로 24',
+  phone: '043-000-1120',
+  hours: '평일 09:00 - 18:00',
+  languages: ['ko', 'en', 'vi'],
+  distanceKm: 0.8,
+  isOpen: true,
+  services: ['노동상담', '통역 연결', '체류·임금 안내'],
+  foreignerFriendly: true,
+  linkedFeedIds: [3],
+  linkedPostIds: [1],
+  reviews: [
+    '임금이나 계약 문제를 한국어가 서툴러도 차근차근 안내받을 수 있어요.',
+    '방문 전 전화로 상담 가능 언어와 시간을 확인하는 것이 좋아요.',
+  ],
+  lat: 36.713,
+  lng: 127.429,
+  mapX: 73,
+  mapY: 57,
+  source: 'operator',
+  approvalStatus: 'approved',
+  saved: false,
+  reviewHistory: ['운영자 등록', '외국인 친화 상담기관으로 표시'],
+})
 
 export const placeReports: PlaceReport[] = places
   .filter((place) => place.source === 'user')
