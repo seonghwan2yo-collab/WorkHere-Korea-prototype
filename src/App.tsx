@@ -517,6 +517,8 @@ function App() {
     const theme = isDarkMode ? 'dark' : 'light'
     localStorage.setItem('workhere-theme', theme)
     document.documentElement.dataset.theme = theme
+    document.body.classList.toggle('theme-dark', isDarkMode)
+    document.body.classList.toggle('theme-light', !isDarkMode)
   }, [isDarkMode])
 
   useEffect(() => {
@@ -2935,6 +2937,7 @@ function LifeMapScreen({
 
   const selectRegion = (region: string) => {
     setPlaceRegionQuery(region)
+    setLocationNotice(`${region} 기준으로 지도 마커와 장소 목록을 다시 보여드립니다.`)
     setShowRegionSheet(false)
     setActivePlace(undefined)
   }
@@ -2961,6 +2964,7 @@ function LifeMapScreen({
           places={searchedPlaces}
           activePlace={currentActivePlace}
           region={effectiveRegion}
+          onOpenRegion={() => setShowRegionSheet(true)}
           onSelect={selectPlace}
           onLocate={requestLocation}
           onSave={(place) => onSave(place.id)}
@@ -3050,11 +3054,11 @@ function CategoryTabs({ selected, resultLabel, onSelect }: { selected: string[];
   )
 }
 
-function MapPanel({ places, activePlace, region, onSelect, onLocate, onSave }: { places: Place[]; activePlace?: Place; region: string; onSelect: (place: Place) => void; onLocate: () => void; onSave: (place: Place) => void }) {
+function MapPanel({ places, activePlace, region, onOpenRegion, onSelect, onLocate, onSave }: { places: Place[]; activePlace?: Place; region: string; onOpenRegion: () => void; onSelect: (place: Place) => void; onLocate: () => void; onSave: (place: Place) => void }) {
   return (
     <section className="map-panel" aria-label="생활도움 지도">
       <div className="map-toolbar">
-        <span className="map-region-label">{region}</span>
+        <button className="map-region-label" type="button" onClick={onOpenRegion}><MapPin size={14} />{region}</button>
         <button className="map-floating-button" type="button" onClick={onLocate}><MapPin size={16} />현재 위치</button>
       </div>
       <LifeMapView places={places} activePlace={activePlace} region={region} onSelect={onSelect} onLocate={onLocate} onSave={onSave} />
@@ -3162,7 +3166,7 @@ function PlaceCard({ place, active, onSelect, onDetail, onSave, t }: { place: Pl
 
 function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect: (region: string) => void; onClose: () => void }) {
   const currentRegion = regionOptions.find((region) => region.value === current)
-  return (
+  return createPortal(
     <div className="region-sheet-backdrop" role="presentation" onClick={onClose}>
       <section className="region-sheet" role="dialog" aria-modal="true" aria-label="지역 선택" onClick={(event) => event.stopPropagation()}>
         <div className="sheet-header">
@@ -3180,22 +3184,26 @@ function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect
             <span>병원, 약국, 상담기관, 송금, 행정기관을 먼저 보여줍니다.</span>
           </div>
         </div>
-        <div className="region-grid">
+        <div className="region-list" aria-label="지역 목록">
           {regionOptions.map((region) => (
             <button className={`region-option ${current === region.value ? 'active' : ''}`} key={region.value} type="button" onClick={() => onSelect(region.value)}>
-              <span>{region.region1}</span>
-              <strong>{region.region2}</strong>
-              <small>{region.value === '충북 오창' ? '오창읍 주변 샘플 지도' : '지역 기준 장소 보기'}</small>
+              <span className="region-option-pin"><MapPin size={15} /></span>
+              <span className="region-option-copy">
+                <strong>{region.region1} {region.region2}</strong>
+                <small>{region.value === '충북 오창' ? '오창읍 주변 샘플 지도' : '지역 기준 장소 보기'}</small>
+              </span>
+              <ChevronRight size={15} />
             </button>
           ))}
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
 function LocationPermissionModal({ onSelect, onClose }: { onSelect: (mode: 'whileUsing' | 'once' | 'denied') => void; onClose: () => void }) {
-  return (
+  return createPortal(
     <div className="location-permission-backdrop" role="presentation" onClick={onClose}>
       <section className="location-permission-modal" role="dialog" aria-modal="true" aria-label="위치 권한 선택" onClick={(event) => event.stopPropagation()}>
         <div className="location-permission-icon"><MapPin size={24} /></div>
@@ -3207,7 +3215,8 @@ function LocationPermissionModal({ onSelect, onClose }: { onSelect: (mode: 'whil
           <button className="ghost-button" type="button" onClick={() => onSelect('denied')}>허용 안 함</button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
