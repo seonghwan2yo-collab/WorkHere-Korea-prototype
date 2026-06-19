@@ -8364,6 +8364,21 @@ textarea {
   color: #06111d;
 }
 
+.theme-dark .desktop-rail .tab-button.active {
+  color: #edf6ff;
+  background:
+    linear-gradient(135deg, rgba(35, 83, 111, 0.94), rgba(22, 55, 78, 0.94));
+  border: 1px solid rgba(124, 198, 255, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 28px rgba(0, 0, 0, 0.18);
+}
+
+.theme-dark .desktop-rail .tab-button.active span,
+.theme-dark .desktop-rail .tab-button.active svg {
+  color: #edf6ff;
+}
+
 .theme-dark .community-post-actions button,
 .theme-dark .community-detail-action-bar button {
   color: var(--color-muted);
