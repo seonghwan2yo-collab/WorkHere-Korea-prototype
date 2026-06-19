@@ -7670,7 +7670,9 @@ textarea {
 .theme-dark .admin-row,
 .theme-dark .admin-log-list,
 .theme-dark .salary-result,
+.theme-dark .pay-result,
 .theme-dark .calculation-card,
+.theme-dark .policy-box,
 .theme-dark .policy-notice,
 .theme-dark .info-box,
 .theme-dark .info-line,
@@ -7679,6 +7681,50 @@ textarea {
   background: rgba(17, 29, 43, 0.96);
   border-color: var(--color-border);
   color: var(--color-text);
+}
+
+.theme-dark .pay-result {
+  background:
+    radial-gradient(circle at 50% 10%, rgba(124, 198, 255, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(17, 34, 52, 0.98), rgba(10, 25, 40, 0.98));
+  border-color: rgba(175, 205, 235, 0.2);
+  color: #edf6ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 16px 34px rgba(0, 0, 0, 0.24);
+}
+
+.theme-dark .pay-result svg {
+  color: #8ce8d8;
+}
+
+.theme-dark .pay-result span {
+  color: #c9d8e8;
+}
+
+.theme-dark .pay-result strong {
+  color: #f4fbff;
+  text-shadow: 0 8px 22px rgba(124, 198, 255, 0.2);
+}
+
+.theme-dark .policy-box,
+.theme-dark .policy-notice {
+  background:
+    linear-gradient(180deg, rgba(39, 31, 20, 0.94), rgba(31, 29, 25, 0.96));
+  border-color: rgba(255, 211, 112, 0.26);
+  color: #ffe8b0;
+}
+
+.theme-dark .policy-box li,
+.theme-dark .policy-box p,
+.theme-dark .policy-notice li,
+.theme-dark .policy-notice p {
+  color: #ffe8b0;
+}
+
+.theme-dark .policy-box svg,
+.theme-dark .policy-notice svg {
+  color: #ffd370;
 }
 
 .theme-dark .help-emergency-card {
@@ -8196,6 +8242,45 @@ textarea {
 .theme-dark .visa-job-notice.restricted {
   background: rgba(64, 24, 24, 0.82);
   border-color: rgba(255, 138, 122, 0.28);
+}
+
+.theme-dark .job-nearby-section {
+  background:
+    linear-gradient(180deg, rgba(17, 34, 52, 0.98), rgba(12, 29, 45, 0.98));
+  border-color: rgba(175, 205, 235, 0.18);
+  color: #edf6ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 34px rgba(0, 0, 0, 0.22);
+}
+
+.theme-dark .job-nearby-card {
+  background: rgba(12, 29, 45, 0.98);
+  border-color: rgba(175, 205, 235, 0.18);
+  color: #edf6ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.theme-dark .job-nearby-card:hover,
+.theme-dark .job-nearby-card:focus-visible {
+  background: rgba(16, 47, 62, 0.96);
+  border-color: rgba(124, 198, 255, 0.34);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.theme-dark .job-nearby-card span {
+  color: #8ce8d8;
+  background: rgba(88, 215, 196, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(88, 215, 196, 0.2);
+}
+
+.theme-dark .job-nearby-card strong,
+.theme-dark .job-nearby-head h3 {
+  color: #f4fbff;
+}
+
+.theme-dark .job-nearby-head p {
+  color: #b8c9db;
 }
 
 .theme-dark .community-post-qa,
