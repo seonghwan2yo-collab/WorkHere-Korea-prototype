@@ -436,6 +436,7 @@ function App() {
   const [placeLanguageFilter, setPlaceLanguageFilter] = useState<'all' | Language>('all')
   const [translatedFeedIds, setTranslatedFeedIds] = useState<number[]>([])
   const [isBottomNavCompact, setIsBottomNavCompact] = useState(false)
+  const [isTopbarHidden, setIsTopbarHidden] = useState(false)
   const [profile, setProfile] = useState<UserProfile>({
     nationality: 'Vietnam',
     region: '경기 안산',
@@ -540,10 +541,38 @@ function App() {
   }, [isCommunityFilterSheetOpen])
 
   useEffect(() => {
+    setIsTopbarHidden(false)
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     })
   }, [screen])
+
+  useEffect(() => {
+    if (!showShell) return undefined
+    let lastScrollY = window.scrollY
+    let ticking = false
+    const handleTopbarScroll = () => {
+      if (ticking) return
+      ticking = true
+      window.requestAnimationFrame(() => {
+        const currentScrollY = window.scrollY
+        const delta = currentScrollY - lastScrollY
+        if (currentScrollY < 80) {
+          setIsTopbarHidden(false)
+        } else if (delta > 8) {
+          setIsTopbarHidden(true)
+        } else if (delta < -8) {
+          setIsTopbarHidden(false)
+        }
+        lastScrollY = Math.max(currentScrollY, 0)
+        ticking = false
+      })
+    }
+    window.addEventListener('scroll', handleTopbarScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleTopbarScroll)
+    }
+  }, [showShell, screen])
 
   useEffect(() => {
     if (!showShell) return undefined
@@ -1189,7 +1218,7 @@ function App() {
       ) : null}
 
       <main className={showShell ? 'content' : 'full-screen'}>
-        {showShell ? <Topbar language={language} setLanguage={setLang} t={t} go={go} screen={screen} onBack={handleHeaderBack} onSearch={handleSearch} /> : null}
+        {showShell ? <Topbar language={language} setLanguage={setLang} t={t} go={go} screen={screen} hidden={isTopbarHidden} onBack={handleHeaderBack} onSearch={handleSearch} /> : null}
 
         {screen === 'splash' && (
           <HeroSection t={t} onStart={() => go('language')} />
@@ -2641,6 +2670,7 @@ function Topbar({
   t,
   go,
   screen,
+  hidden,
   onBack,
   onSearch,
 }: {
@@ -2649,12 +2679,13 @@ function Topbar({
   t: Record<string, string>
   go: (screen: Screen) => void
   screen: Screen
+  hidden: boolean
   onBack: () => void
   onSearch: (keyword: string) => void
 }) {
   const isHome = screen === 'home'
   return (
-    <header className={isHome ? 'topbar' : 'topbar subpage'}>
+    <header className={`${isHome ? 'topbar' : 'topbar subpage'}${hidden ? ' topbar-search-hidden' : ''}`}>
       <div className="topbar-main">
         {isHome ? (
           <button className="topbar-brand" onClick={() => go('home')} type="button" aria-label={`${t.appName} 홈`}>

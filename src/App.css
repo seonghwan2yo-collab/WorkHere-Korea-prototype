@@ -18,7 +18,6 @@
   color-scheme: dark;
 }
 
-.theme-dark .topbar,
 .theme-dark .desktop-rail {
   background: rgba(7, 20, 33, 0.86);
   border-color: rgba(175, 205, 235, 0.14);
@@ -363,12 +362,21 @@ button {
   top: 0;
   z-index: 20;
   min-height: 116px;
-  padding: 12px 0 14px;
+  margin: 0 -16px;
+  padding: 12px 16px 14px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
-  background: rgba(238, 248, 255, 0.86);
-  backdrop-filter: blur(18px);
+  background: var(--app-soft-blue-bg);
+  background-attachment: fixed;
+  overflow: hidden;
+  transition: min-height 0.22s ease, padding 0.22s ease, gap 0.22s ease;
+}
+
+.topbar-search-hidden {
+  min-height: 66px;
+  gap: 0;
+  padding-bottom: 10px;
 }
 
 .topbar-main {
@@ -480,11 +488,33 @@ textarea {
 
 .topbar-search {
   min-height: 44px;
+  max-height: 52px;
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 0 14px;
   border-radius: var(--radius-card);
+  opacity: 1;
+  overflow: hidden;
+  transform: translateY(0);
+  transition:
+    max-height 0.22s ease,
+    min-height 0.22s ease,
+    opacity 0.18s ease,
+    padding 0.22s ease,
+    border-color 0.18s ease,
+    transform 0.22s ease;
+}
+
+.topbar-search-hidden .topbar-search {
+  min-height: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
 }
 
 .topbar-search:focus-within {
@@ -7878,6 +7908,178 @@ textarea {
 
 .theme-dark .help-cta-card.secondary .help-cta-copy small {
   color: #c9d8e8;
+}
+
+.theme-dark .panel .metric,
+.theme-dark .metric,
+.theme-dark .admin-tile,
+.theme-dark .moderation-card,
+.theme-dark .admin-row,
+.theme-dark .admin-log-list,
+.theme-dark .admin-stat-grid .admin-tile {
+  background:
+    linear-gradient(180deg, rgba(17, 34, 52, 0.98), rgba(12, 29, 45, 0.98));
+  border: 1px solid rgba(175, 205, 235, 0.18);
+  color: #edf6ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 14px 30px rgba(0, 0, 0, 0.18);
+}
+
+.theme-dark .metric span,
+.theme-dark .admin-tile span,
+.theme-dark .admin-row small,
+.theme-dark .admin-log-list small {
+  color: #b8c9db;
+}
+
+.theme-dark .metric strong,
+.theme-dark .admin-tile strong,
+.theme-dark .admin-row strong {
+  color: #f4fbff;
+}
+
+.theme-dark .admin-tile svg,
+.theme-dark .metric svg {
+  color: #c8eaff;
+}
+
+.theme-dark .panel .metric + .metric {
+  margin-top: 0;
+}
+
+.theme-dark .community-detail-article,
+.theme-dark .community-detail-footer-actions {
+  background:
+    linear-gradient(180deg, rgba(17, 34, 52, 0.98), rgba(12, 29, 45, 0.98));
+  border-color: rgba(175, 205, 235, 0.18);
+  color: #edf6ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 34px rgba(0, 0, 0, 0.22);
+}
+
+.theme-dark .community-detail-title,
+.theme-dark .community-detail-author strong,
+.theme-dark .community-comment-head strong,
+.theme-dark .community-detail-footer-actions strong {
+  color: #f4fbff;
+}
+
+.theme-dark .community-detail-body,
+.theme-dark .community-comment-copy p {
+  color: #dce9f6;
+}
+
+.theme-dark .community-detail-meta-row span,
+.theme-dark .community-comment-head span,
+.theme-dark .community-detail-attachment {
+  color: #d8edff;
+  background: rgba(124, 198, 255, 0.14);
+  border-color: rgba(175, 205, 235, 0.18);
+}
+
+.theme-dark .community-detail-meta-row span.danger {
+  color: #ffc2bb;
+  background: rgba(127, 29, 29, 0.36);
+}
+
+.theme-dark .community-comment-copy small,
+.theme-dark .community-comments-heading span,
+.theme-dark .community-comments-heading p,
+.theme-dark .community-detail-section-kicker {
+  color: #b8c9db;
+}
+
+.theme-dark .community-comment-thread {
+  border-top-color: rgba(175, 205, 235, 0.16);
+}
+
+.theme-dark .community-comment-item.reply {
+  border-left-color: rgba(124, 198, 255, 0.26);
+}
+
+.theme-dark .community-comment-copy button,
+.theme-dark .community-detail-action-bar button,
+.theme-dark .community-detail-action-bar span {
+  color: #c9d8e8;
+}
+
+.theme-dark .community-detail-comment-input input {
+  color: #edf6ff;
+  background: rgba(12, 29, 45, 0.98);
+  border-color: rgba(175, 205, 235, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.theme-dark .community-detail-comment-input input::placeholder {
+  color: #8fa4b9;
+}
+
+.theme-dark .community-detail-action-bar {
+  border-color: rgba(175, 205, 235, 0.16);
+}
+
+.theme-dark .community-detail-more > div,
+.theme-dark .community-post-more > div {
+  background: rgba(12, 29, 45, 0.98);
+  border-color: rgba(175, 205, 235, 0.2);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
+}
+
+.theme-dark .community-detail-more > div button,
+.theme-dark .community-post-more button {
+  color: #d8edff;
+}
+
+.theme-dark .community-detail-help-strip,
+.theme-dark .community-post-translation,
+.theme-dark .community-translation-card {
+  background:
+    linear-gradient(135deg, rgba(16, 47, 62, 0.94), rgba(15, 36, 56, 0.96));
+  border-color: rgba(175, 205, 235, 0.18);
+  color: #edf6ff !important;
+}
+
+.theme-dark .community-detail-help-strip strong,
+.theme-dark .community-translation-card strong {
+  color: #f4fbff;
+}
+
+.theme-dark .community-detail-help-strip span,
+.theme-dark .community-translation-card p {
+  color: #c9d8e8;
+}
+
+.theme-dark .popular-community-posts,
+.theme-dark .community-post-navigation {
+  color: #edf6ff;
+}
+
+.theme-dark .popular-community-posts {
+  background:
+    linear-gradient(180deg, rgba(17, 34, 52, 0.98), rgba(12, 29, 45, 0.98));
+  border-color: rgba(175, 205, 235, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 34px rgba(0, 0, 0, 0.22);
+}
+
+.theme-dark .popular-community-heading h2,
+.theme-dark .popular-community-list strong,
+.theme-dark .community-nav-card strong {
+  color: #f4fbff;
+}
+
+.theme-dark .popular-community-heading span,
+.theme-dark .popular-community-list span,
+.theme-dark .community-nav-card small {
+  color: #b8c9db;
+}
+
+.theme-dark .popular-community-list .popular-community-rank {
+  color: #06111d;
+  background: #d8edff;
 }
 
 .theme-dark .job-result-summary,
