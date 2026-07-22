@@ -135,6 +135,9 @@ export type Place = {
   lng: number
   mapX?: number
   mapY?: number
+  externalUrl?: string
+  directionsUrl?: string
+  lastVerifiedAt?: string
   source: 'operator' | 'user'
   approvalStatus: ApprovalStatus
   saved?: boolean

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   AlertTriangle,
@@ -73,6 +73,7 @@ import { LifeMapView } from './components/map/LifeMapView'
 import { HomeBannerCarousel } from './components/home/HomeBannerCarousel'
 import { homeBanners, type HomeBanner } from './data/homeBanners'
 import { flattenJobRegions, jobRegions } from './data/regions'
+import { searchLifeMapPlaces, type LifeMapSearchMode, type LifeMapSearchResult } from './services/kakaoLocal'
 import {
   getVisaFilterNotice,
   getVisaJobMatch,
@@ -188,7 +189,7 @@ type HelpCategoryView = Omit<HelpCategory, 'icon'> & { icon: typeof HeartHandsha
 
 const dailyCategories: DailyCategory[] = ['회사생활', '한국생활', '음식', '쉬는날', '숙소생활', '질문', '자랑/축하', '조심하세요']
 const dangerWords = ['임금체불', '사기', '폭행', '여권 보관', '여권보관']
-const lifeMapCategories = ['병원', '약국', '상담기관', '송금/은행', '통신/유심', '음식점/마트', '행정기관', '안전/산재', '종교/커뮤니티']
+const lifeMapCategories = ['병원', '약국', '상담기관', '송금/은행', '통신/유심', '음식점/마트', '행정기관', '안전/산재', '외국인 밀집지역', '종교/커뮤니티']
 const defaultPlaceFilters = ['병원', '약국', '상담기관', '송금/은행', '행정기관']
 const fallbackHelpTypes = [
   {
@@ -321,14 +322,30 @@ const helpTypes: HelpCategoryView[] = rawHelpCategories.map((item) => ({
   icon: helpCategoryIcons[item.icon] || HeartHandshake,
 }))
 const regionOptions = [
+  { region1: '전체', region2: '지역', value: '전체 지역' },
   { region1: '경기', region2: '안산', value: '경기 안산' },
+  { region1: '경기', region2: '화성', value: '경기 화성' },
   { region1: '경기', region2: '시흥', value: '경기 시흥' },
+  { region1: '경기', region2: '평택', value: '경기 평택' },
+  { region1: '경기', region2: '김포', value: '경기 김포' },
+  { region1: '서울', region2: '구로', value: '서울 구로' },
+  { region1: '서울', region2: '영등포', value: '서울 영등포' },
+  { region1: '인천', region2: '부평', value: '인천 부평' },
+  { region1: '충북', region2: '도청', value: '충북 도청' },
+  { region1: '충북', region2: '청주', value: '충북 청주' },
   { region1: '충북', region2: '오창', value: '충북 오창' },
   { region1: '충북', region2: '음성', value: '충북 음성' },
+  { region1: '충북', region2: '진천', value: '충북 진천' },
   { region1: '경남', region2: '김해', value: '경남 김해' },
   { region1: '경남', region2: '창원', value: '경남 창원' },
+  { region1: '대구', region2: '달서', value: '대구 달서' },
+  { region1: '경북', region2: '경산', value: '경북 경산' },
+  { region1: '부산', region2: '사상', value: '부산 사상' },
+  { region1: '충남', region2: '아산', value: '충남 아산' },
   { region1: '충남', region2: '천안', value: '충남 천안' },
+  { region1: '전북', region2: '익산', value: '전북 익산' },
   { region1: '전남', region2: '광주', value: '전남 광주' },
+  { region1: '제주', region2: '제주시', value: '제주 제주시' },
 ]
 const languageFilterOptions: Array<{ value: 'all' | Language; label: string }> = [
   { value: 'all', label: '모든 언어' },
@@ -414,10 +431,11 @@ function App() {
   const [isDailyComposerOpen, setIsDailyComposerOpen] = useState(false)
   const [dailyToast, setDailyToast] = useState('')
   const [dailyFilter, setDailyFilter] = useState('all')
+  const [dailyViewer, setDailyViewer] = useState<{ feedId: number; imageIndex: number } | null>(null)
   const [selectedJobRegionCodes, setSelectedJobRegionCodes] = useState<string[]>([])
   const [selectedJobVisaTypes, setSelectedJobVisaTypes] = useState<VisaType[]>(['E-9'])
   const [showRestrictedJobs, setShowRestrictedJobs] = useState(false)
-  const [placeFilters, setPlaceFilters] = useState<string[]>(defaultPlaceFilters)
+  const [placeFilters, setPlaceFilters] = useState<string[]>(lifeMapCategories)
   const [communityFilters, setCommunityFilters] = useState({
     region: 'all',
     country: 'all',
@@ -432,7 +450,7 @@ function App() {
   const [communityToast, setCommunityToast] = useState('')
   const [blockedAuthorIds, setBlockedAuthorIds] = useState<number[]>([])
   const [translatedPostIds, setTranslatedPostIds] = useState<number[]>([])
-  const [placeRegionQuery, setPlaceRegionQuery] = useState('충북 오창')
+  const [placeRegionQuery, setPlaceRegionQuery] = useState('전체 지역')
   const [placeLanguageFilter, setPlaceLanguageFilter] = useState<'all' | Language>('all')
   const [translatedFeedIds, setTranslatedFeedIds] = useState<number[]>([])
   const [isBottomNavCompact, setIsBottomNavCompact] = useState(false)
@@ -466,9 +484,15 @@ function App() {
   const filteredJobs = filteredJobsWithMatch.map(({ job }) => job)
   const selectedJobVisaMatch = getVisaJobMatch(selectedJob, selectedJobVisaType)
   const placeRegionKeyword = placeRegionQuery.trim()
-  const placeRegionFilterKeyword = placeRegionKeyword === '충북 오창' ? '충북 청주' : placeRegionKeyword
+  const placeRegionFilterKeyword = placeRegionKeyword === '전체 지역' || placeRegionKeyword === '현재 위치'
+    ? ''
+    : placeRegionKeyword === '충북 오창'
+    ? '충북 청주'
+    : placeRegionKeyword === '충북 도청'
+      ? '충북'
+      : placeRegionKeyword
   const filteredPlaces = approvedPlaces
-    .filter((place) => placeFilters.includes(place.category))
+    .filter((place) => placeFilters.includes(place.category) || (placeRegionKeyword === '전체 지역' && place.category === '외국인 밀집지역'))
     .filter((place) => !placeRegionFilterKeyword || `${place.region} ${place.address}`.includes(placeRegionFilterKeyword))
     .filter((place) => placeLanguageFilter === 'all' || place.languages.includes(placeLanguageFilter))
     .sort((a, b) => (a.distanceKm || 99) - (b.distanceKm || 99))
@@ -530,6 +554,15 @@ function App() {
       document.body.style.overflow = originalOverflow
     }
   }, [isDailyComposerOpen])
+
+  useEffect(() => {
+    if (!dailyViewer) return undefined
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [dailyViewer])
 
   useEffect(() => {
     if (!isCommunityFilterSheetOpen) return undefined
@@ -1048,6 +1081,34 @@ function App() {
     logAction('장소 제보 반려', place?.name || `장소 #${placeId}`, '비노출 및 수정 요청 이력 저장')
   }
 
+  const updateAdminPlace = (event: React.FormEvent<HTMLFormElement>, placeId: number) => {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const place = places.find((item) => item.id === placeId)
+    const services = String(form.get('services') || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+    const nextPlaces = places.map((item) => (item.id === placeId ? {
+      ...item,
+      name: String(form.get('name') || item.name),
+      category: String(form.get('category') || item.category),
+      region: String(form.get('region') || item.region),
+      address: String(form.get('address') || item.address),
+      phone: String(form.get('phone') || item.phone),
+      hours: String(form.get('hours') || item.hours),
+      services: services.length ? services : item.services,
+      lastVerifiedAt: '관리자 방금 확인',
+      reviewHistory: [
+        ...(item.reviewHistory || []),
+        `관리자 수정 저장: ${String(form.get('memo') || '노출 전 정보 보정')}`,
+      ],
+    } : item))
+    setPlaces(nextPlaces)
+    setSelectedPlace(nextPlaces.find((item) => item.id === selectedPlace.id) ?? selectedPlace)
+    logAction('장소 정보 수정', place?.name || `장소 #${placeId}`, String(form.get('memo') || '관리자 검수 정보 업데이트'))
+  }
+
   const updateReportStatus = (reportId: string, status: ReportStatus) => {
     const report = adminReports.find((item) => item.id === reportId)
     setAdminReports(adminReports.map((item) => (item.id === reportId ? { ...item, status } : item)))
@@ -1164,6 +1225,7 @@ function App() {
       reviews: [],
       lat: 37.21,
       lng: 126.84,
+      lastVerifiedAt: '사용자 제보 검토 전',
       source: 'user',
       approvalStatus: 'pending',
       reviewHistory: ['사용자 장소 제보 접수', '관리자 검토 대기'],
@@ -1347,6 +1409,10 @@ function App() {
                   onJob={() => feed.jobId && openJobFromFeed(feed.jobId)}
                   onHelp={() => go('help')}
                   onQuestion={() => shareFeedQuestion(feed)}
+                  onOpenViewer={(imageIndex) => {
+                    setDailyViewer({ feedId: feed.id, imageIndex })
+                    trackEvent('feed_viewed', 'daily', `viewer:${feed.id}`)
+                  }}
                 />
               ))}
             </div>
@@ -1358,6 +1424,39 @@ function App() {
                 places={places}
                 onClose={() => setIsDailyComposerOpen(false)}
                 onSubmit={submitDaily}
+              />
+            ) : null}
+            {dailyViewer ? (
+              <DailyFeedFullscreenViewer
+                feeds={filteredFeeds}
+                imageIndex={dailyViewer.imageIndex}
+                feedId={dailyViewer.feedId}
+                t={t}
+                translatedFeedIds={translatedFeedIds}
+                places={places}
+                jobs={jobs}
+                onClose={() => setDailyViewer(null)}
+                onChangeFeed={(feedId, imageIndex = 0) => setDailyViewer({ feedId, imageIndex })}
+                onTranslate={(feed) => {
+                  setTranslatedFeedIds(toggleId(translatedFeedIds, feed.id))
+                  trackEvent('feed_viewed', 'daily', `viewer_translate:${feed.id}`)
+                }}
+                onLike={(feed) => {
+                  updateFeed(feed.id, { likes: feed.likes + 1 }, '피드 좋아요')
+                  trackEvent('feed_liked', 'daily', `viewer:${feed.id}`)
+                }}
+                onComment={(feed) => {
+                  updateFeed(feed.id, { comments: [...feed.comments, '전체화면에서 남긴 댓글입니다.'] }, '피드 댓글 작성')
+                  trackEvent('feed_commented', 'daily', `viewer:${feed.id}`)
+                }}
+                onSave={(feed) => {
+                  updateFeed(feed.id, { saved: !feed.saved }, '피드 저장')
+                  trackEvent('feed_saved', 'daily', `viewer:${feed.id}`)
+                }}
+                onPlace={(feed) => feed.placeId && openPlaceFromFeed(feed.placeId)}
+                onJob={(feed) => feed.jobId && openJobFromFeed(feed.jobId)}
+                onHelp={() => go('help')}
+                onQuestion={(feed) => shareFeedQuestion(feed)}
               />
             ) : null}
           </ScreenFrame>
@@ -1621,6 +1720,7 @@ function App() {
         {screen === 'placeDetail' && (
           <PlaceDetailScreen
             t={t}
+            profile={profile}
             selectedPlace={selectedPlace}
             feeds={visibleFeeds}
             posts={visiblePosts}
@@ -1629,7 +1729,10 @@ function App() {
             onReport={reportPlace}
             onFeed={() => go('daily')}
             onPost={(post) => { setSelectedPost(post); go('postDetail') }}
-            onDirections={() => trackEvent('place_viewed', 'placeDetail', `directions:${selectedPlace.id}`)}
+            onDirections={() => {
+              trackEvent('place_viewed', 'placeDetail', `directions:${selectedPlace.id}`)
+              openPlaceDirections(selectedPlace)
+            }}
           />
         )}
 
@@ -1648,7 +1751,10 @@ function App() {
               <Panel title={t.reviews}>
                 {selectedPlace.reviews.length ? selectedPlace.reviews.map((review, index) => <ReviewLine key={review} review={review} index={index} />) : <p className="empty-text">No reviews yet</p>}
               </Panel>
-              <button className="secondary-button stretch" onClick={() => trackEvent('place_viewed', 'placeDetail', `directions:${selectedPlace.id}`)} type="button"><MapPin size={18} />길찾기</button>
+              <button className="primary-button stretch" onClick={() => {
+                trackEvent('place_viewed', 'placeDetail', `directions:${selectedPlace.id}`)
+                openPlaceDirections(selectedPlace)
+              }} type="button"><MapPin size={18} />길찾기</button>
               <button className="primary-button stretch" onClick={() => togglePlaceSave(selectedPlace.id)} type="button"><Bookmark size={18} />{t.save}</button>
               <button className="secondary-button danger stretch" onClick={reportPlace} type="button"><Flag size={18} />장소 신고</button>
             </article>
@@ -2280,15 +2386,16 @@ function App() {
 
         {screen === 'adminPlaces' && (
           <AdminManage title="장소 제보 승인 관리" back={() => go('admin')}>
-            {places.map((place) => (
-              <div className="admin-row" key={place.id}>
-                <span>{place.name}</span>
-                <small>{place.source === 'user' ? '사용자 장소 제보' : '운영자 등록'} · {place.region} · {(place.reviewHistory || []).join(' / ')}</small>
-                <strong>{statusLabel[place.approvalStatus]}</strong>
-                {place.approvalStatus !== 'approved' ? <button className="secondary-button small" onClick={() => approvePlace(place.id)} type="button">승인</button> : null}
-                <button className="secondary-button small danger" onClick={() => rejectPlace(place.id)} type="button">반려</button>
-              </div>
-            ))}
+            <AdminPlaceModeration
+              places={places}
+              onApprove={approvePlace}
+              onEdit={updateAdminPlace}
+              onReject={rejectPlace}
+              onSelect={(place) => {
+                setSelectedPlace(place)
+                go('placeDetail')
+              }}
+            />
           </AdminManage>
         )}
 
@@ -2636,6 +2743,41 @@ function countryFlag(countryCode: string) {
   return '🌐'
 }
 
+const placeCountryLabels: Record<string, string> = {
+  VN: '베트남',
+  CN: '중국',
+  UZ: '우즈베키스탄',
+  TH: '태국',
+}
+
+function countryCodeFromNationalityValue(value?: string) {
+  if (!value) return undefined
+  const normalized = value.toLowerCase()
+  if (normalized.includes('vietnam') || value.includes('베트남')) return 'VN'
+  if (normalized.includes('china') || value.includes('중국')) return 'CN'
+  if (normalized.includes('uzbek') || value.includes('우즈베키스탄')) return 'UZ'
+  if (normalized.includes('thai') || value.includes('태국')) return 'TH'
+  return undefined
+}
+
+function getPlaceCountryBadges(place: Place) {
+  const codes = new Set<string>()
+  place.linkedFeedIds?.forEach((feedId) => {
+    const feed = initialDailyFeeds.find((item) => item.id === feedId)
+    const code = feed?.countryCode || countryCodeFromNationalityValue(feed?.nationality)
+    if (code) codes.add(code)
+  })
+  place.linkedPostIds?.forEach((postId) => {
+    const post = initialPosts.find((item) => item.id === postId)
+    const code = post?.countryCode || countryCodeFromNationalityValue(post?.countryName)
+    if (code) codes.add(code)
+  })
+  return [...codes].slice(0, 4).map((code) => ({
+    code,
+    label: placeCountryLabels[code] || code,
+  }))
+}
+
 function supportInstitutionsForCategory(category: HelpCategoryView, institutions: SupportInstitution[]) {
   const issueTypes = new Set(category.issueTypes)
   return institutions.filter((institution) => institution.issueTypes.some((type) => issueTypes.has(type))).slice(0, 4)
@@ -2924,16 +3066,59 @@ function LifeMapScreen({
   const [showRegionSheet, setShowRegionSheet] = useState(false)
   const [showLocationPermission, setShowLocationPermission] = useState(false)
   const [isSheetExpanded, setIsSheetExpanded] = useState(false)
-  const [locationNotice, setLocationNotice] = useState('현재 위치를 허용하면 가까운 병원, 약국, 상담기관을 더 쉽게 찾을 수 있습니다.')
+  const [locationNotice, setLocationNotice] = useState('전체 지역 기준으로 외국인 밀집지역과 생활도움 장소를 함께 보여드립니다.')
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [lifeMapSearchPlaces, setLifeMapSearchPlaces] = useState<Place[] | null>(null)
+  const [lifeMapSearchMode, setLifeMapSearchMode] = useState<LifeMapSearchMode>('local-mock')
+  const [lifeMapSearchMessage, setLifeMapSearchMessage] = useState('MVP 장소 데이터로 생활도움 지도를 표시 중입니다.')
+  const [lifeMapSearchMeta, setLifeMapSearchMeta] = useState<LifeMapSearchResult['meta']>({
+    keyword: '',
+    region: '',
+    kakaoCount: 0,
+    fallbackCount: 0,
+    totalCount: 0,
+    queriedTerms: [],
+  })
+  const [isLifeMapSearching, setIsLifeMapSearching] = useState(false)
+  const [placeSourceFilter, setPlaceSourceFilter] = useState<PlaceSourceFilter>('all')
+  const [placeSortMode, setPlaceSortMode] = useState<PlaceSortMode>('distance')
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(() => typeof window === 'undefined' ? true : !window.matchMedia('(max-width: 760px)').matches)
+  const mapPanelRef = useRef<HTMLElement | null>(null)
+  const placeListRef = useRef<HTMLElement | null>(null)
+  const reportFormRef = useRef<HTMLFormElement | null>(null)
   const effectiveRegion = placeRegionQuery || profile.region
-  const placeRegionSearchTerm = effectiveRegion === '충북 오창' ? '충북 청주' : effectiveRegion
-  const regionPlaces = filteredPlaces.filter((place) => `${place.region} ${place.address}`.includes(placeRegionSearchTerm))
-  const searchedPlaces = regionPlaces.filter((place) => {
+  const hasGpsLocation = Boolean(currentLocation)
+  const localSearchRegion = hasGpsLocation
+    ? '현재 위치'
+    : effectiveRegion === '전체 지역'
+      ? '전국'
+    : effectiveRegion === '충북 도청'
+      ? '충북 청주'
+      : effectiveRegion
+  const regionPlaces = useMemo(
+    () => filteredPlaces.filter((place) => placeMatchesLifeMapRegion(place, effectiveRegion, hasGpsLocation)),
+    [effectiveRegion, filteredPlaces, hasGpsLocation],
+  )
+  const fallbackSearchedPlaces = regionPlaces.filter((place) => {
     const keyword = mapSearch.trim()
     if (!keyword) return true
     return `${place.name} ${place.category} ${place.services?.join(' ')}`.includes(keyword)
   })
-  const currentActivePlace = activePlace && searchedPlaces.some((place) => place.id === activePlace.id)
+  const searchedPlaces = lifeMapSearchPlaces ?? fallbackSearchedPlaces
+  const searchedPlacesByRegion = useMemo(
+    () => searchedPlaces.filter((place) => placeMatchesLifeMapRegion(place, effectiveRegion, hasGpsLocation)),
+    [effectiveRegion, hasGpsLocation, searchedPlaces],
+  )
+  const placeSourceCounts = useMemo(() => getPlaceSourceCounts(searchedPlacesByRegion), [searchedPlacesByRegion])
+  const displayedPlaces = useMemo(
+    () => sortPlacesByMode(
+      searchedPlacesByRegion.filter((place) => filterPlaceBySource(place, placeSourceFilter)),
+      placeSortMode,
+    ),
+    [placeSortMode, searchedPlacesByRegion, placeSourceFilter],
+  )
+  const placeFilterKey = placeFilters.join('|')
+  const currentActivePlace = activePlace && displayedPlaces.some((place) => place.id === activePlace.id)
     ? activePlace
     : undefined
   const selectedFilterLabel = placeFilters.length === 0
@@ -2941,7 +3126,56 @@ function LifeMapScreen({
     : placeFilters.length === 1
       ? placeFilters[0]
       : `${placeFilters.length}개 유형`
-  const resultLabel = `${selectedFilterLabel} ${searchedPlaces.length}곳`
+  const resultLabel = `${selectedFilterLabel} ${displayedPlaces.length}곳`
+  const placeEmptyCopy = getPlaceEmptyCopy(mapSearch, placeSourceFilter)
+  const showRecoveryActions = lifeMapSearchMode === 'kakao-local-error' || locationNotice.includes('권한이')
+  const activeFilterChips = getPlaceFilterSummaryChips({
+    categories: placeFilters,
+    keyword: mapSearch,
+    language: placeLanguageFilter,
+    region: effectiveRegion,
+    source: placeSourceFilter,
+    sort: placeSortMode,
+    usingGps: hasGpsLocation,
+  })
+
+  const resetPlaceFilters = () => {
+    setMapSearch('')
+    setPlaceSourceFilter('all')
+    setPlaceSortMode('distance')
+    setPlaceLanguageFilter('all')
+    setPlaceFilters([...defaultPlaceFilters])
+    setActivePlace(undefined)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    setIsLifeMapSearching(true)
+
+    const timeoutId = window.setTimeout(() => {
+      searchLifeMapPlaces({
+        keyword: mapSearch,
+        region: localSearchRegion,
+        categories: placeFilters,
+        language: placeLanguageFilter,
+        fallbackPlaces: regionPlaces,
+        location: currentLocation,
+      }).then((result) => {
+        if (cancelled) return
+        setLifeMapSearchPlaces(result.places)
+        setLifeMapSearchMode(result.mode)
+        setLifeMapSearchMessage(result.message)
+        setLifeMapSearchMeta(result.meta)
+      }).finally(() => {
+        if (!cancelled) setIsLifeMapSearching(false)
+      })
+    }, 220)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [currentLocation, localSearchRegion, mapSearch, placeFilterKey, placeLanguageFilter, regionPlaces])
 
   const requestLocation = () => {
     setShowLocationPermission(true)
@@ -2950,25 +3184,86 @@ function LifeMapScreen({
   const applyLocationPermission = (mode: 'whileUsing' | 'once' | 'denied') => {
     setShowLocationPermission(false)
     if (mode === 'denied') {
+      setCurrentLocation(null)
       setLocationNotice('위치 권한이 없어 선택한 지역 기준으로 장소를 보여드립니다.')
       return
     }
-    setPlaceRegionQuery(profile.region)
-    setActivePlace(undefined)
-    setLocationNotice(mode === 'whileUsing'
-      ? '앱을 사용하는 동안 현재 위치 기준으로 주변 장소를 보여드립니다.'
-      : '이번 한 번만 현재 위치 기준으로 주변 장소를 보여드립니다.')
+
+    if (!navigator.geolocation) {
+      setCurrentLocation(null)
+      setLocationNotice('이 브라우저에서는 위치 기능을 사용할 수 없어 선택한 지역 기준으로 장소를 보여드립니다.')
+      return
+    }
+
+    setLocationNotice('현재 GPS 위치를 확인하고 있습니다.')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCurrentLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+        setPlaceRegionQuery('현재 위치')
+        setActivePlace(undefined)
+        setLocationNotice(mode === 'whileUsing'
+          ? '앱을 사용하는 동안 실제 GPS 위치 기준으로 가까운 장소를 보여드립니다.'
+          : '이번 한 번만 실제 GPS 위치 기준으로 가까운 장소를 보여드립니다.')
+      },
+      () => {
+        setCurrentLocation(null)
+        setLocationNotice('위치 권한이 거부되었거나 위치를 확인하지 못해 선택한 지역 기준으로 장소를 보여드립니다.')
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60000,
+        timeout: 10000,
+      },
+    )
   }
 
-  const selectPlace = (place: Place) => {
+  const scrollToElement = (element: HTMLElement | null | undefined, offset = 88) => {
+    if (!element) return
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const top = element.getBoundingClientRect().top + window.scrollY - offset
+    window.scrollTo({
+      top: Math.max(top, 0),
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    })
+  }
+
+  const scrollToMapPanel = () => {
+    scrollToElement(mapPanelRef.current, window.matchMedia('(max-width: 760px)').matches ? 82 : 24)
+  }
+
+  const scrollToPlaceList = () => {
+    const activeCard = activePlace
+      ? placeListRef.current?.querySelector<HTMLElement>(`[data-place-id="${activePlace.id}"]`)
+      : null
+    scrollToElement(activeCard || placeListRef.current, window.matchMedia('(max-width: 760px)').matches ? 78 : 24)
+  }
+
+  const scrollToReportForm = () => {
+    scrollToElement(reportFormRef.current, window.matchMedia('(max-width: 760px)').matches ? 84 : 24)
+  }
+
+  const selectPlace = (place: Place, source: 'map' | 'list' = 'map') => {
     setActivePlace(place)
     setSelectedPlace(place)
     setIsSheetExpanded(false)
+    if (source === 'list' && window.matchMedia('(max-width: 760px)').matches) {
+      window.requestAnimationFrame(scrollToMapPanel)
+    }
   }
 
   const selectRegion = (region: string) => {
+    setCurrentLocation(null)
     setPlaceRegionQuery(region)
-    setLocationNotice(`${region} 기준으로 지도 마커와 장소 목록을 다시 보여드립니다.`)
+    setPlaceSourceFilter('all')
+    if (region === '전체 지역') {
+      setPlaceFilters([...lifeMapCategories])
+    }
+    setLocationNotice(region === '전체 지역'
+      ? '전체 지역 기준으로 외국인 밀집지역과 생활도움 장소를 함께 보여드립니다.'
+      : `${region} 기준으로 지도 마커와 장소 목록을 다시 보여드립니다.`)
     setShowRegionSheet(false)
     setActivePlace(undefined)
   }
@@ -2977,35 +3272,158 @@ function LifeMapScreen({
     <ScreenFrame title="내 주변 생활도움 지도" subtitle="병원, 약국, 상담기관, 송금, 통신 장소를 지역별로 찾아보세요.">
       <section className="life-map-page">
         <div className="life-map-controls">
-          <RegionFilter region={effectiveRegion} onOpen={() => setShowRegionSheet(true)} onLocate={requestLocation} />
           <div className="topbar-search life-map-search">
             <Search size={17} />
             <input value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="병원, 약국, 상담기관 검색" aria-label="생활도움 장소 검색" />
+            {mapSearch ? (
+              <button className="life-map-search-clear" type="button" onClick={() => {
+                setMapSearch('')
+                setActivePlace(undefined)
+              }} aria-label="검색어 지우기">×</button>
+            ) : null}
           </div>
-          <label>언어 지원<select value={placeLanguageFilter} onChange={(event) => setPlaceLanguageFilter(event.target.value as 'all' | Language)}>{languageFilterOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+          <label className="life-map-language-field">
+            <span>언어 지원</span>
+            <select value={placeLanguageFilter} onChange={(event) => setPlaceLanguageFilter(event.target.value as 'all' | Language)} aria-label="생활지도 언어 지원 필터">
+              {languageFilterOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
         </div>
         <InfoLine icon={<CircleHelp size={16} />} text={locationNotice} />
+        <div className={`life-map-source-status ${lifeMapSearchMode}`}>
+          <span>{isLifeMapSearching ? '장소 검색 중' : lifeMapSearchMode === 'kakao-local' ? '카카오 Local 연결' : lifeMapSearchMode === 'kakao-local-error' ? 'Local 연결 실패' : 'MVP 데이터'}</span>
+          <p>{lifeMapSearchMessage}</p>
+        </div>
+        {showRecoveryActions ? (
+          <LifeMapRecoveryActions
+            onOpenRegion={() => setShowRegionSheet(true)}
+            onReportPlace={scrollToReportForm}
+            onReset={resetPlaceFilters}
+          />
+        ) : null}
+        <LifeMapSearchSummary
+          meta={lifeMapSearchMeta}
+          loading={isLifeMapSearching}
+          mode={lifeMapSearchMode}
+          displayedCount={displayedPlaces.length}
+          sourceFilter={placeSourceFilter}
+          onFocusMap={scrollToMapPanel}
+          onReset={resetPlaceFilters}
+        />
+        <AppliedPlaceFilters
+          chips={activeFilterChips}
+          expanded={isFilterPanelOpen}
+          onReset={resetPlaceFilters}
+          onToggle={() => setIsFilterPanelOpen((current) => !current)}
+        />
+        <LifeMapQuickRegions
+          current={effectiveRegion}
+          onFocusMap={scrollToMapPanel}
+          onSelect={selectRegion}
+        />
+        {effectiveRegion === '전체 지역' ? (
+          <LifeMapRegionOverview
+            places={displayedPlaces}
+            onSelect={(region) => {
+              selectRegion(region)
+              window.requestAnimationFrame(scrollToMapPanel)
+            }}
+          />
+        ) : null}
+        <div className={`life-map-filter-panel ${isFilterPanelOpen ? 'open' : ''}`}>
+          <div className="life-map-filter-panel-head">
+            <div>
+              <strong>지도 필터</strong>
+              <span>유형, 출처, 정렬 기준을 한 번에 조정합니다.</span>
+            </div>
+            <button type="button" onClick={() => setIsFilterPanelOpen(false)}>접기</button>
+          </div>
+          <PlaceCategoryTabs
+            selected={placeFilters}
+            onSelect={(value) => {
+              setPlaceFilters((current) => togglePlaceFilter(current, value))
+              setActivePlace(undefined)
+            }}
+          />
+          <PlaceSourceTabs
+            selected={placeSourceFilter}
+            counts={placeSourceCounts}
+            onSelect={(value) => {
+              setPlaceSourceFilter(value)
+              setActivePlace(undefined)
+            }}
+          />
+          <PlaceSortTabs
+            selected={placeSortMode}
+            onSelect={(value) => {
+              setPlaceSortMode(value)
+              setActivePlace(undefined)
+            }}
+          />
+        </div>
       </section>
-      <CategoryTabs selected={placeFilters} resultLabel={resultLabel} onSelect={(value) => {
-        setPlaceFilters((current) => togglePlaceFilter(current, value))
-        setActivePlace(undefined)
-      }} />
       <div className="life-map-workspace">
         <MapPanel
-          places={searchedPlaces}
+          places={displayedPlaces}
           activePlace={currentActivePlace}
+          emptyDescription={placeEmptyCopy.description}
+          emptyTitle={placeEmptyCopy.title}
+          isSearching={isLifeMapSearching}
+          panelRef={(element) => {
+            mapPanelRef.current = element
+          }}
           region={effectiveRegion}
+          onFocusList={scrollToPlaceList}
           onOpenRegion={() => setShowRegionSheet(true)}
-          onSelect={selectPlace}
+          onSelect={(place) => selectPlace(place, 'map')}
           onLocate={requestLocation}
-          onSave={(place) => onSave(place.id)}
+          onReportPlace={scrollToReportForm}
+          controls={(
+            <MapOverlayControls
+              filterOpen={isFilterPanelOpen}
+              region={effectiveRegion}
+              resultLabel={resultLabel}
+              onFilterToggle={() => setIsFilterPanelOpen((current) => !current)}
+              onFocusList={scrollToPlaceList}
+              onLocate={requestLocation}
+              onOpenRegion={() => setShowRegionSheet(true)}
+            />
+          )}
+          onReset={() => {
+            resetPlaceFilters()
+          }}
         />
         <PlaceList
-          places={searchedPlaces}
+          places={displayedPlaces}
           activePlace={currentActivePlace}
-          onSelect={selectPlace}
+          categories={placeFilters}
+          emptyDescription={placeEmptyCopy.description}
+          emptyTitle={placeEmptyCopy.title}
+          panelRef={(element) => {
+            placeListRef.current = element
+          }}
+          region={effectiveRegion}
+          sortMode={placeSortMode}
+          onFocusMap={scrollToMapPanel}
+          onSelect={(place) => selectPlace(place, 'list')}
           onDetail={(place) => { setSelectedPlace(place); onPlaceView(place) }}
+          onOpenRegion={() => setShowRegionSheet(true)}
+          onReportPlace={scrollToReportForm}
+          onReset={resetPlaceFilters}
+          onShowAllRegions={() => {
+            selectRegion('전체 지역')
+            setPlaceSourceFilter('all')
+            window.requestAnimationFrame(scrollToMapPanel)
+          }}
+          onShowOperatorOnly={() => {
+            setPlaceSourceFilter('operator')
+            setActivePlace(undefined)
+          }}
           onSave={(place) => onSave(place.id)}
+          onSortChange={(value) => {
+            setPlaceSortMode(value)
+            setActivePlace(undefined)
+          }}
           t={t}
         />
       </div>
@@ -3017,12 +3435,13 @@ function LifeMapScreen({
           onClose={() => setActivePlace(undefined)}
           onDetail={() => onPlaceView(currentActivePlace)}
           onSave={() => onSave(currentActivePlace.id)}
+          profile={profile}
           t={t}
         />
       ) : null}
       {showRegionSheet ? <RegionSheet current={effectiveRegion} onSelect={selectRegion} onClose={() => setShowRegionSheet(false)} /> : null}
       {showLocationPermission ? <LocationPermissionModal onSelect={applyLocationPermission} onClose={() => setShowLocationPermission(false)} /> : null}
-      <form className="form-card life-map-report-form" onSubmit={onSubmitPlace}>
+      <form className="form-card life-map-report-form" onSubmit={onSubmitPlace} ref={reportFormRef}>
         <h2>신규 장소 제보</h2>
         <p className="empty-text">사용자가 제보한 장소는 관리자 검수 후 지도에 노출됩니다.</p>
         <div className="form-grid">
@@ -3037,18 +3456,412 @@ function LifeMapScreen({
   )
 }
 
-function RegionFilter({ region, onOpen, onLocate }: { region: string; onOpen: () => void; onLocate: () => void }) {
+type PlaceSourceFilter = 'all' | 'operator' | 'kakao' | 'saved'
+type PlaceSortMode = 'distance' | 'kakao' | 'operator' | 'saved'
+
+function getPlaceSourceCounts(places: Place[]) {
+  return places.reduce(
+    (counts, place) => {
+      counts.all += 1
+      if (place.saved) counts.saved += 1
+      if (place.externalUrl || place.id < 0) {
+        counts.kakao += 1
+      } else {
+        counts.operator += 1
+      }
+      return counts
+    },
+    { all: 0, operator: 0, kakao: 0, saved: 0 },
+  )
+}
+
+function filterPlaceBySource(place: Place, source: PlaceSourceFilter) {
+  if (source === 'all') return true
+  if (source === 'saved') return Boolean(place.saved)
+  if (source === 'kakao') return Boolean(place.externalUrl || place.id < 0)
+  return !place.externalUrl && place.id >= 0
+}
+
+function getPlaceSourceRank(place: Place, mode: PlaceSortMode) {
+  const isKakao = Boolean(place.externalUrl || place.id < 0)
+  const isOperator = !isKakao && place.source === 'operator'
+  const isSaved = Boolean(place.saved)
+  if (mode === 'kakao') return isKakao ? 0 : 1
+  if (mode === 'operator') return isOperator ? 0 : 1
+  if (mode === 'saved') return isSaved ? 0 : 1
+  return 0
+}
+
+function sortPlacesByMode(places: Place[], mode: PlaceSortMode) {
+  return [...places].sort((a, b) => {
+    const sourceRank = getPlaceSourceRank(a, mode) - getPlaceSourceRank(b, mode)
+    if (sourceRank !== 0) return sourceRank
+
+    const distanceRank = (a.distanceKm ?? 99) - (b.distanceKm ?? 99)
+    if (distanceRank !== 0) return distanceRank
+
+    const operatorRank = (a.source === 'operator' ? 0 : 1) - (b.source === 'operator' ? 0 : 1)
+    if (operatorRank !== 0) return operatorRank
+
+    return a.name.localeCompare(b.name, 'ko')
+  })
+}
+
+function getLifeMapRegionSearchTerm(region: string) {
+  if (region === '전체 지역' || region === '현재 위치') return ''
+  if (region === '충북 오창') return '충북 청주'
+  if (region === '충북 도청') return '충북'
+  return region
+}
+
+function placeMatchesLifeMapRegion(place: Place, region: string, usingGps: boolean) {
+  if (usingGps || region === '전체 지역') return true
+  const regionSearchTerm = getLifeMapRegionSearchTerm(region)
+  if (!regionSearchTerm) return true
+  return `${place.region} ${place.address}`.includes(regionSearchTerm)
+}
+
+function getPlaceEmptyCopy(searchKeyword: string, sourceFilter: PlaceSourceFilter) {
+  if (searchKeyword.trim()) {
+    return {
+      title: '검색어와 맞는 장소가 없습니다.',
+      description: '검색어를 줄이거나 지역·유형 필터를 조정해보세요.',
+    }
+  }
+  if (sourceFilter === 'kakao') {
+    return {
+      title: '카카오 검색 결과가 없습니다.',
+      description: '다른 유형을 선택하거나 검색어를 입력하면 카카오 Local 결과를 다시 확인합니다.',
+    }
+  }
+  if (sourceFilter === 'saved') {
+    return {
+      title: '저장한 장소가 없습니다.',
+      description: '필요한 장소를 저장하면 이 목록에서 빠르게 다시 볼 수 있습니다.',
+    }
+  }
+  return {
+    title: '이 조건에 맞는 장소가 없습니다.',
+    description: '새로운 장소를 제보하면 관리자 검수 후 지도에 반영됩니다.',
+  }
+}
+
+function getPlaceSourceLabel(source: PlaceSourceFilter) {
+  if (source === 'operator') return '운영자 추천'
+  if (source === 'kakao') return '카카오 검색'
+  if (source === 'saved') return '저장됨'
+  return '전체 출처'
+}
+
+function getPlaceSortLabel(sort: PlaceSortMode) {
+  if (sort === 'kakao') return '카카오 검색순'
+  if (sort === 'operator') return '운영자 우선'
+  if (sort === 'saved') return '저장 우선'
+  return '가까운순'
+}
+
+function getPlaceLanguageLabel(language: 'all' | Language) {
+  return languageFilterOptions.find((item) => item.value === language)?.label ?? '모든 언어'
+}
+
+function getPlaceFilterSummaryChips({
+  categories,
+  keyword,
+  language,
+  region,
+  source,
+  sort,
+  usingGps,
+}: {
+  categories: string[]
+  keyword: string
+  language: 'all' | Language
+  region: string
+  source: PlaceSourceFilter
+  sort: PlaceSortMode
+  usingGps: boolean
+}) {
+  const chips = [
+    usingGps ? '지역: 현재 위치' : `지역: ${region}`,
+    `정렬: ${getPlaceSortLabel(sort)}`,
+  ]
+  const trimmedKeyword = keyword.trim()
+  if (trimmedKeyword) chips.push(`검색: ${trimmedKeyword}`)
+  if (source !== 'all') chips.push(`출처: ${getPlaceSourceLabel(source)}`)
+  if (language !== 'all') chips.push(`언어: ${getPlaceLanguageLabel(language)}`)
+  if (categories.length === 0) {
+    chips.push('유형: 선택 없음')
+  } else if (categories.length !== defaultPlaceFilters.length || defaultPlaceFilters.some((category) => !categories.includes(category))) {
+    chips.push(categories.length === 1 ? `유형: ${categories[0]}` : `유형: ${categories.length}개`)
+  }
+  return chips
+}
+
+function AppliedPlaceFilters({
+  chips,
+  expanded,
+  onReset,
+  onToggle,
+}: {
+  chips: string[]
+  expanded: boolean
+  onReset: () => void
+  onToggle: () => void
+}) {
   return (
-    <div className="region-filter">
-      <button className="region-select-button" type="button" onClick={onOpen} aria-label="지역 선택">
-        <MapPin size={17} />
-        <span>{region}</span>
-        <ChevronRight size={15} />
-      </button>
-      <button className="current-location-button" type="button" onClick={onLocate}>
-        현재 위치
-      </button>
-    </div>
+    <section className="applied-place-filters" aria-label="현재 적용된 필터">
+      <div className="applied-place-filters-head">
+        <div>
+          <strong>현재 적용된 필터</strong>
+          <span>{chips.length}개 조건 · 아래 장소 목록과 지도에 적용됩니다.</span>
+        </div>
+        <button type="button" onClick={onToggle} aria-expanded={expanded}>
+          {expanded ? '접기' : '필터 보기'}
+        </button>
+      </div>
+      <div className="applied-filter-chip-row">
+        {chips.map((chip) => (
+          <span className="applied-filter-chip" key={chip}>{chip}</span>
+        ))}
+      </div>
+      <button className="applied-filter-reset" type="button" onClick={onReset}>필터 초기화</button>
+    </section>
+  )
+}
+
+function LifeMapQuickRegions({
+  current,
+  onFocusMap,
+  onSelect,
+}: {
+  current: string
+  onFocusMap: () => void
+  onSelect: (region: string) => void
+}) {
+  const quickRegions = [
+    '전체 지역',
+    '경기 안산',
+    '경기 화성',
+    '경기 시흥',
+    '서울 구로',
+    '충남 아산',
+    '경남 김해',
+    '충북 도청',
+  ]
+    .map((value) => regionOptions.find((region) => region.value === value))
+    .filter(Boolean) as typeof regionOptions
+
+  return (
+    <section className="life-map-quick-regions" aria-label="주요 외국인 밀집 지역 바로가기">
+      <div className="life-map-quick-regions-head">
+        <div>
+          <strong>빠른 지역</strong>
+          <span>외국인 밀집 생활권을 바로 확인하세요.</span>
+        </div>
+        <button type="button" onClick={onFocusMap}>지도 보기</button>
+      </div>
+      <div className="life-map-quick-region-row">
+        {quickRegions.map((region) => (
+          <button
+            aria-pressed={current === region.value}
+            className={`life-map-quick-region ${current === region.value ? 'active' : ''}`}
+            key={region.value}
+            onClick={() => {
+              onSelect(region.value)
+              window.requestAnimationFrame(onFocusMap)
+            }}
+            type="button"
+          >
+            <MapPin size={13} />
+            <span>{region.region1} {region.region2}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function LifeMapRegionOverview({ places, onSelect }: { places: Place[]; onSelect: (region: string) => void }) {
+  const regionCounts = Object.entries(places.reduce<Record<string, number>>((acc, place) => {
+    acc[place.region] = (acc[place.region] || 0) + 1
+    return acc
+  }, {}))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+
+  if (!regionCounts.length) return null
+
+  return (
+    <section className="life-map-region-overview" aria-label="전체 지역 요약">
+      <div>
+        <strong>전체 지역 보기</strong>
+        <span>지역 묶음을 선택하면 해당 권역 지도로 바로 이동합니다.</span>
+      </div>
+      <div className="life-map-region-overview-row">
+        {regionCounts.map(([region, count]) => (
+          <button key={region} type="button" onClick={() => onSelect(region)}>
+            <span>{region}</span>
+            <strong>{count}곳</strong>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function PlaceSortTabs({ selected, onSelect }: { selected: PlaceSortMode; onSelect: (value: PlaceSortMode) => void }) {
+  const tabs: Array<{ value: PlaceSortMode; label: string }> = [
+    { value: 'distance', label: '가까운순' },
+    { value: 'kakao', label: '카카오 검색순' },
+    { value: 'operator', label: '운영자 추천 우선' },
+    { value: 'saved', label: '저장한 장소 우선' },
+  ]
+
+  return (
+    <section className="place-sort-tabs" aria-label="장소 정렬">
+      <div className="place-sort-tabs-label">정렬</div>
+      <div className="place-sort-chip-row">
+        {tabs.map((tab) => (
+          <button
+            aria-pressed={selected === tab.value}
+            className={`place-sort-chip ${selected === tab.value ? 'active' : ''}`}
+            key={tab.value}
+            onClick={() => onSelect(tab.value)}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function PlaceSourceTabs({ selected, counts, onSelect }: { selected: PlaceSourceFilter; counts: ReturnType<typeof getPlaceSourceCounts>; onSelect: (value: PlaceSourceFilter) => void }) {
+  const tabs: Array<{ value: PlaceSourceFilter; label: string; count: number }> = [
+    { value: 'all', label: '전체', count: counts.all },
+    { value: 'operator', label: '운영자 추천', count: counts.operator },
+    { value: 'kakao', label: '카카오 검색', count: counts.kakao },
+    { value: 'saved', label: '저장됨', count: counts.saved },
+  ]
+
+  return (
+    <section className="place-source-tabs" aria-label="장소 출처 필터">
+      <div className="place-source-tabs-label">결과 보기</div>
+      <div className="place-source-chip-row">
+        {tabs.map((tab) => (
+          <button
+            className={`place-source-chip ${selected === tab.value ? 'active' : ''}`}
+            key={tab.value}
+            type="button"
+            onClick={() => onSelect(tab.value)}
+            aria-pressed={selected === tab.value}
+          >
+            <span>{tab.label}</span>
+            <strong>{tab.count}</strong>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function LifeMapSearchSummary({
+  meta,
+  loading,
+  mode,
+  displayedCount,
+  sourceFilter,
+  onFocusMap,
+  onReset,
+}: {
+  meta: LifeMapSearchResult['meta']
+  loading: boolean
+  mode: LifeMapSearchMode
+  displayedCount: number
+  sourceFilter: PlaceSourceFilter
+  onFocusMap: () => void
+  onReset: () => void
+}) {
+  const hasKeyword = Boolean(meta.keyword)
+  const queryLabel = hasKeyword ? `"${meta.keyword}" 검색` : `${meta.region || '선택 지역'} 기준 추천`
+  const modeLabel = mode === 'kakao-local'
+    ? '카카오 Local'
+    : mode === 'kakao-local-error'
+      ? '로컬 데이터'
+      : 'MVP 데이터'
+  const sourceLabel = sourceFilter === 'all'
+    ? '전체'
+    : sourceFilter === 'operator'
+      ? '운영자 추천'
+      : sourceFilter === 'kakao'
+        ? '카카오 검색'
+        : '저장됨'
+
+  return (
+    <section className="life-map-search-summary" aria-label="장소 검색 결과 요약">
+      <div>
+        <strong>{loading ? '검색 결과를 불러오는 중' : queryLabel}</strong>
+        <span>{sourceLabel} {displayedCount}곳 표시 · {modeLabel}</span>
+      </div>
+      <div className="life-map-search-metrics">
+        <span>카카오 {meta.kakaoCount}</span>
+        <span>추천 {meta.fallbackCount}</span>
+      </div>
+      <button type="button" onClick={onFocusMap}>지도 보기</button>
+      {(hasKeyword || sourceFilter !== 'all') ? (
+        <button type="button" onClick={onReset}>초기화</button>
+      ) : null}
+    </section>
+  )
+}
+
+function LifeMapRecoveryActions({ onReset, onOpenRegion, onReportPlace }: { onReset: () => void; onOpenRegion: () => void; onReportPlace: () => void }) {
+  return (
+    <section className="life-map-recovery-actions" aria-label="생활지도 다음 액션">
+      <div>
+        <strong>다음 행동을 선택해보세요</strong>
+        <span>검색이 막히거나 위치 권한이 없을 때도 지역 기준으로 계속 탐색할 수 있습니다.</span>
+      </div>
+      <div>
+        <button className="primary-button mini" type="button" onClick={onReset}>필터 초기화</button>
+        <button className="secondary-button mini" type="button" onClick={onOpenRegion}>지역 바꾸기</button>
+        <button className="secondary-button mini" type="button" onClick={onReportPlace}>장소 제보</button>
+      </div>
+    </section>
+  )
+}
+
+function PlaceCategoryTabs({ selected, onSelect }: { selected: string[]; onSelect: (value: string) => void }) {
+  const allSelected = selected.length === lifeMapCategories.length
+  const tabs = ['all', ...lifeMapCategories]
+
+  return (
+    <section className="place-category-tabs" aria-label="장소 유형 필터">
+      <div className="place-category-tabs-head">
+        <div>
+          <strong>유형</strong>
+          <span>{allSelected ? '모든 유형 표시 중' : `${selected.length}개 유형 선택됨`}</span>
+        </div>
+        <button type="button" onClick={() => onSelect('all')}>{allSelected ? '선택 해제' : '전체 선택'}</button>
+      </div>
+      <div className="place-category-chip-grid">
+        {tabs.map((tab) => {
+          const active = tab === 'all' ? allSelected : selected.includes(tab)
+          return (
+            <button
+              aria-pressed={active}
+              className={`place-category-chip ${active ? 'active' : ''}`}
+              key={tab}
+              type="button"
+              onClick={() => onSelect(tab)}
+            >
+              {tab === 'all' ? '모든 유형' : tab}
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -3062,95 +3875,261 @@ function togglePlaceFilter(current: string[], value: string) {
   return [...current, value]
 }
 
-function CategoryTabs({ selected, resultLabel, onSelect }: { selected: string[]; resultLabel: string; onSelect: (value: string) => void }) {
-  const tabs = ['all', ...lifeMapCategories]
-  const allSelected = selected.length === lifeMapCategories.length
+function MapOverlayControls({
+  filterOpen,
+  region,
+  resultLabel,
+  onFilterToggle,
+  onFocusList,
+  onLocate,
+  onOpenRegion,
+}: {
+  filterOpen: boolean
+  region: string
+  resultLabel: string
+  onFilterToggle: () => void
+  onFocusList: () => void
+  onLocate: () => void
+  onOpenRegion: () => void
+}) {
   return (
-    <section className="category-tabs" aria-label="장소 유형 필터">
-      <div className="category-tabs-header">
-        <strong>유형별 보기</strong>
-        <span>{resultLabel}</span>
+    <div className="map-overlay-controls" aria-label="지도 필터">
+      <div className="map-overlay-main-actions">
+        <button className="map-overlay-chip region" type="button" onClick={onOpenRegion}>
+          <MapPin size={14} />
+          <span>{region}</span>
+        </button>
+        <button className="map-overlay-chip locate" type="button" onClick={onLocate}>현재 위치</button>
+        <button className={`map-overlay-chip filter ${filterOpen ? 'active' : ''}`} type="button" onClick={onFilterToggle}>
+          <span>{filterOpen ? '필터 접기' : '필터'}</span>
+        </button>
+        <button className="map-overlay-chip list" type="button" onClick={onFocusList}><span>목록</span></button>
       </div>
-      <div className="category-chip-scroll">
-        {tabs.map((tab) => {
-          const active = tab === 'all' ? allSelected : selected.includes(tab)
-          return (
-            <button className={`category-chip ${active ? 'active' : ''}`} key={tab} type="button" onClick={() => onSelect(tab)} aria-pressed={active}>
-              {tab === 'all' ? '전체' : tab}
-            </button>
-          )
-        })}
-      </div>
-    </section>
+      <div className="map-overlay-result-pill">{resultLabel}</div>
+    </div>
   )
 }
 
-function MapPanel({ places, activePlace, region, onOpenRegion, onSelect, onLocate, onSave }: { places: Place[]; activePlace?: Place; region: string; onOpenRegion: () => void; onSelect: (place: Place) => void; onLocate: () => void; onSave: (place: Place) => void }) {
+function MapPanel({
+  places,
+  activePlace,
+  emptyTitle,
+  emptyDescription,
+  controls,
+  isSearching,
+  panelRef,
+  region,
+  onFocusList,
+  onOpenRegion,
+  onSelect,
+  onLocate,
+  onReportPlace,
+  onReset,
+}: {
+  places: Place[]
+  activePlace?: Place
+  emptyTitle: string
+  emptyDescription: string
+  controls?: ReactNode
+  isSearching: boolean
+  panelRef: (element: HTMLElement | null) => void
+  region: string
+  onFocusList: () => void
+  onOpenRegion: () => void
+  onSelect: (place: Place) => void
+  onLocate: () => void
+  onReportPlace: () => void
+  onReset: () => void
+}) {
   return (
-    <section className="map-panel" aria-label="생활도움 지도">
+    <section className="map-panel" aria-label="생활도움 지도" ref={panelRef}>
       <div className="map-toolbar">
         <button className="map-region-label" type="button" onClick={onOpenRegion}><MapPin size={14} />{region}</button>
         <button className="map-floating-button" type="button" onClick={onLocate}><MapPin size={16} />현재 위치</button>
       </div>
-      <LifeMapView places={places} activePlace={activePlace} region={region} onSelect={onSelect} onLocate={onLocate} onSave={onSave} />
+      {activePlace ? (
+        <div className="map-list-sync-note" aria-live="polite">
+          <MapPin size={14} />
+          <span>{activePlace.name} 선택됨</span>
+          <button type="button" onClick={onFocusList}>목록에서 보기</button>
+        </div>
+      ) : null}
+      <LifeMapView
+        activePlace={activePlace}
+        controls={controls}
+        emptyDescription={emptyDescription}
+        emptyTitle={emptyTitle}
+        isSearching={isSearching}
+        places={places}
+        region={region}
+        onLocate={onLocate}
+        onOpenRegion={onOpenRegion}
+        onFocusList={onFocusList}
+        onReportPlace={onReportPlace}
+        onReset={onReset}
+        onSelect={onSelect}
+      />
     </section>
   )
 }
 
-function PlaceBottomSheet({ place, expanded, setExpanded, onClose, onDetail, onSave, t }: { place: Place; expanded: boolean; setExpanded: (value: boolean) => void; onClose: () => void; onDetail: () => void; onSave: () => void; t: Record<string, string> }) {
-  return (
-    <aside className={`place-bottom-sheet ${expanded ? 'expanded' : ''}`} aria-label="선택 장소 요약">
+function PlaceBottomSheet({ place, expanded, setExpanded, onClose, onDetail, onSave, profile, t }: { place: Place; expanded: boolean; setExpanded: (value: boolean) => void; onClose: () => void; onDetail: () => void; onSave: () => void; profile: UserProfile; t: Record<string, string> }) {
+  const sourceBadge = getPlaceSourceBadge(place)
+  const reliability = getPlaceReliability(place)
+  const isDarkMode = typeof document !== 'undefined' && document.querySelector('.app-shell')?.classList.contains('theme-dark')
+  const distanceLabel = `${place.distanceKm?.toFixed(1) || '-'}km`
+  const countryBadges = getPlaceCountryBadges(place)
+
+  return createPortal(
+    <div className={`place-sheet-portal ${isDarkMode ? 'theme-dark' : 'theme-light'}`}>
+      <aside className={`place-bottom-sheet ${expanded ? 'expanded' : ''}`} aria-label="선택 장소 요약">
       <button className="sheet-handle-button" type="button" onClick={() => setExpanded(!expanded)} aria-label={expanded ? '장소 정보 접기' : '장소 정보 펼치기'}>
         <span />
       </button>
+      <button className="sheet-close-button" type="button" onClick={onClose} aria-label="닫기">×</button>
+      <div className="sheet-hero-summary">
+        <div>
+          <span className="sheet-kicker">선택한 장소</span>
+          <h3>{place.name}</h3>
+          <p>{place.region} · {distanceLabel} · {place.category}</p>
+        </div>
+        <div className={`sheet-trust-pill ${sourceBadge.type}`}>
+          <strong>{getCompactTrustLabel(place)}</strong>
+          <small>{reliability.label}</small>
+        </div>
+      </div>
+      <div className="sheet-primary-actions" aria-label="장소 빠른 액션">
+        <button className="primary-button mini sheet-primary-action" type="button" onClick={() => openPlaceDirections(place)}>길찾기</button>
+        <a className="secondary-button mini sheet-call-action" href={`tel:${place.phone}`}>전화</a>
+        <button className="secondary-button mini" type="button" onClick={onSave}><Bookmark size={14} />{t.save}</button>
+      </div>
       <div className="sheet-header">
         <div>
           <div className="place-card-badges">
-            <span className={`category-badge ${categoryClass(place.category)}`}>{place.category}</span>
             <span className={place.isOpen ? 'status-badge success' : 'status-badge warning'}>{place.isOpen ? '영업 중' : '확인 필요'}</span>
+            <span className={`category-badge ${categoryClass(place.category)}`}>{place.category}</span>
           </div>
-          <h3>{place.name}</h3>
-          <p>{place.region} · {place.distanceKm?.toFixed(1) || '-'}km · {languageLabels(place.languages)}</p>
+          {countryBadges.length ? <PlaceCountryLinks countries={countryBadges} compact /> : null}
+          <p>{place.address}</p>
         </div>
-        <button className="icon-button" type="button" onClick={onClose} aria-label="닫기">×</button>
-      </div>
-      <div className="tag-list">
-        {(place.services || []).slice(0, 3).map((service) => <span key={service}>#{service}</span>)}
       </div>
       {expanded ? (
-        <div className="sheet-expanded-content">
-          <p><strong>주소</strong>{place.address}</p>
-          <p><strong>운영시간</strong>{place.hours}</p>
-          <p><strong>후기</strong>{place.reviews[0] || '아직 등록된 후기가 없습니다.'}</p>
-        </div>
+        <>
+          <div className="sheet-insight-grid" aria-label="선택 장소 핵심 정보">
+            <span><strong>{languageLabels(place.languages)}</strong><small>지원 언어</small></span>
+            <span><strong>{reliability.verifiedAt}</strong><small>최근 확인</small></span>
+            <span><strong>{place.reviews.length}개</strong><small>{profile.nationality} 후기 우선</small></span>
+          </div>
+          <PlaceSourceTrust place={place} />
+          <div className="tag-list">
+            {(place.services || []).slice(0, 3).map((service) => <span key={service}>#{service}</span>)}
+          </div>
+          <PlaceReliabilityStrip reliability={reliability} />
+          <div className="sheet-expanded-content">
+            <p><strong>주소</strong>{place.address}</p>
+            <p><strong>운영시간</strong>{place.hours}</p>
+            <p><strong>최근 확인</strong>{reliability.verifiedAt}</p>
+            <p><strong>후기</strong>{place.reviews[0] || '아직 등록된 후기가 없습니다.'}</p>
+            {place.externalUrl ? <p><strong>원본</strong><a href={place.externalUrl} rel="noreferrer" target="_blank">카카오맵 장소 정보 보기</a></p> : null}
+          </div>
+        </>
       ) : null}
       <div className="sheet-actions">
-        <a className="secondary-button mini" href={`tel:${place.phone}`}>전화하기</a>
-        <a
-          className="secondary-button mini"
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.address}`)}`}
-          rel="noreferrer"
-          target="_blank"
-        >
-          길찾기
-        </a>
-        <button className="secondary-button mini" type="button" onClick={onSave}><Bookmark size={14} />{t.save}</button>
-        <button className="primary-button mini" type="button" onClick={onDetail}>상세보기</button>
+        <button className="secondary-button mini" type="button" onClick={() => setExpanded(!expanded)}>{expanded ? '요약만 보기' : '정보 더보기'}</button>
+        <button className="secondary-button mini" type="button" onClick={onDetail}>상세 화면</button>
       </div>
-    </aside>
+      </aside>
+    </div>,
+    document.body,
   )
 }
 
-function PlaceList({ places, activePlace, onSelect, onDetail, onSave, t }: { places: Place[]; activePlace?: Place; onSelect: (place: Place) => void; onDetail: (place: Place) => void; onSave: (place: Place) => void; t: Record<string, string> }) {
+function PlaceList({
+  places,
+  activePlace,
+  categories,
+  emptyTitle,
+  emptyDescription,
+  panelRef,
+  region,
+  sortMode,
+  onFocusMap,
+  onSelect,
+  onDetail,
+  onOpenRegion,
+  onReportPlace,
+  onReset,
+  onShowAllRegions,
+  onShowOperatorOnly,
+  onSave,
+  onSortChange,
+  t,
+}: {
+  places: Place[]
+  activePlace?: Place
+  categories: string[]
+  emptyTitle: string
+  emptyDescription: string
+  panelRef: (element: HTMLElement | null) => void
+  region: string
+  sortMode: PlaceSortMode
+  onFocusMap: () => void
+  onSelect: (place: Place) => void
+  onDetail: (place: Place) => void
+  onOpenRegion: () => void
+  onReportPlace: () => void
+  onReset: () => void
+  onShowAllRegions: () => void
+  onShowOperatorOnly: () => void
+  onSave: (place: Place) => void
+  onSortChange: (value: PlaceSortMode) => void
+  t: Record<string, string>
+}) {
+  const cardRefs = useRef<Record<number, HTMLElement | null>>({})
+  const scrollToActiveCard = () => {
+    if (!activePlace) return
+    cardRefs.current[activePlace.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+  const categorySummary = categories.length === lifeMapCategories.length
+    ? '모든 유형'
+    : categories.length === 0
+      ? '유형 없음'
+      : categories.length <= 2
+        ? categories.join(', ')
+        : `${categories.slice(0, 2).join(', ')} 외 ${categories.length - 2}`
+
   return (
-    <section className="place-list-section">
+    <section className="place-list-section" ref={panelRef}>
       <div className="place-list-header">
         <div>
           <strong>조건에 맞는 장소</strong>
-          <span>{places.length}곳이 표시됩니다</span>
+          <span>{activePlace ? `${activePlace.name} 선택됨` : `${places.length}곳이 표시됩니다`}</span>
         </div>
         <button className="secondary-button mini" type="button">장소 제보</button>
       </div>
+      <div className="place-list-summary-bar" aria-label="장소 목록 조건 요약">
+        <div className="place-list-summary-copy">
+          <strong>{region}</strong>
+          <span>{categorySummary} · 지도와 목록이 함께 업데이트됩니다</span>
+        </div>
+        <label className="place-list-sort-control">
+          <span>정렬</span>
+          <select value={sortMode} onChange={(event) => onSortChange(event.target.value as PlaceSortMode)} aria-label="장소 목록 정렬">
+            <option value="distance">가까운순</option>
+            <option value="operator">운영자 추천</option>
+            <option value="kakao">카카오 검색</option>
+            <option value="saved">저장 우선</option>
+          </select>
+        </label>
+      </div>
+      {activePlace ? (
+        <div className="place-list-sync-note" aria-live="polite">
+          <MapPin size={14} />
+          <span>{activePlace.name} 카드가 목록에서 강조되어 있습니다.</span>
+          <button type="button" onClick={scrollToActiveCard}>선택 카드</button>
+          <button type="button" onClick={onFocusMap}>지도 보기</button>
+        </div>
+      ) : null}
       {places.length ? (
         <div className="place-card-list">
           {places.map((place) => (
@@ -3158,6 +4137,9 @@ function PlaceList({ places, activePlace, onSelect, onDetail, onSave, t }: { pla
               active={activePlace?.id === place.id}
               key={place.id}
               place={place}
+              refCallback={(element) => {
+                cardRefs.current[place.id] = element
+              }}
               onDetail={() => onDetail(place)}
               onSave={() => onSave(place)}
               onSelect={() => onSelect(place)}
@@ -3166,33 +4148,199 @@ function PlaceList({ places, activePlace, onSelect, onDetail, onSave, t }: { pla
           ))}
         </div>
       ) : (
-        <EmptyState title="이 지역에는 아직 등록된 장소가 없습니다." description="새로운 장소를 제보하면 관리자 검수 후 지도에 반영됩니다." actionLabel="장소 제보하기" />
+        <EmptyState
+          title={emptyTitle}
+          description={emptyDescription}
+          actions={[
+            { label: '필터 초기화', onClick: onReset, variant: 'primary' },
+            { label: '전체 지역 보기', onClick: onShowAllRegions },
+            { label: '운영자 추천만', onClick: onShowOperatorOnly },
+            { label: '지역 바꾸기', onClick: onOpenRegion },
+            { label: '장소 제보하기', onClick: onReportPlace },
+          ]}
+        />
       )}
     </section>
   )
 }
 
-function PlaceCard({ place, active, onSelect, onDetail, onSave, t }: { place: Place; active: boolean; onSelect: () => void; onDetail: () => void; onSave: () => void; t: Record<string, string> }) {
+function PlaceCard({
+  place,
+  active,
+  refCallback,
+  onSelect,
+  onDetail,
+  onSave,
+  t,
+}: {
+  place: Place
+  active: boolean
+  refCallback: (element: HTMLElement | null) => void
+  onSelect: () => void
+  onDetail: () => void
+  onSave: () => void
+  t: Record<string, string>
+}) {
+  const sourceBadge = getPlaceSourceBadge(place)
+  const reliability = getPlaceReliability(place)
+  const countryBadges = getPlaceCountryBadges(place)
+
   return (
-    <article className={`place-card ${active ? 'active' : ''}`} onClick={onSelect}>
+    <article
+      aria-label={`${place.name} 장소 선택`}
+      aria-pressed={active}
+      className={`place-card ${active ? 'active' : ''}`}
+      data-place-id={place.id}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect()
+        }
+      }}
+      ref={refCallback}
+      role="button"
+      tabIndex={0}
+    >
       <div className="place-card-badges">
+        {active ? <span className="selected-place-badge">선택됨</span> : null}
         <span className={`category-badge ${categoryClass(place.category)}`}>{place.category}</span>
+        <span className={`source-badge ${sourceBadge.type}`}>{sourceBadge.label}</span>
         <span className={place.isOpen ? 'status-badge success' : 'status-badge warning'}>{place.isOpen ? '영업 중' : '확인 필요'}</span>
       </div>
+      {countryBadges.length ? <PlaceCountryLinks countries={countryBadges} /> : null}
       <h3>{place.name}</h3>
       <p>{place.region} · {place.distanceKm?.toFixed(1) || '-'}km</p>
       <p>지원 언어: {languageLabels(place.languages)}</p>
+      <PlaceSourceTrust place={place} compact />
+      <PlaceReliabilityStrip reliability={reliability} compact />
       <div className="tag-list">
         {(place.services || []).slice(0, 3).map((service) => <span key={service}>#{service}</span>)}
       </div>
       <div className="place-card-actions">
+        <button className="primary-button mini" type="button" onClick={(event) => openPlaceDirections(place, event)}>길찾기</button>
         <a className="secondary-button mini" href={`tel:${place.phone}`} onClick={(event) => event.stopPropagation()}>전화하기</a>
-        <button className="secondary-button mini" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>길찾기</button>
         <button className="secondary-button mini" type="button" onClick={(event) => { event.stopPropagation(); onSave() }}>{t.save}</button>
-        <button className="primary-button mini" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>상세보기</button>
+        <button className="secondary-button mini" type="button" onClick={(event) => { event.stopPropagation(); onDetail() }}>상세보기</button>
       </div>
     </article>
   )
+}
+
+function PlaceCountryLinks({ countries, compact = false }: { countries: Array<{ code: string; label: string }>; compact?: boolean }) {
+  return (
+    <div className={`place-country-links ${compact ? 'compact' : ''}`} aria-label="연결된 활동 국가">
+      <span>활동 국가</span>
+      {countries.map((country) => (
+        <span key={country.code} className={`kakao-country-badge ${country.code.toLowerCase()}`} title={country.label}>
+          {country.code}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function PlaceSourceTrust({ place, compact = false }: { place: Place; compact?: boolean }) {
+  const sourceBadge = getPlaceSourceBadge(place)
+  const reliability = getPlaceReliability(place)
+  const copy = sourceBadge.type === 'operator'
+    ? '운영자가 등록하고 연락처를 확인한 정보입니다.'
+    : sourceBadge.type === 'kakao'
+      ? '카카오 검색 결과입니다. 방문 전 전화 확인을 권장합니다.'
+      : '사용자 제보 기반 정보입니다. 관리자 검수 상태를 확인하세요.'
+
+  return (
+    <div className={`place-source-trust ${compact ? 'compact' : ''} ${sourceBadge.type}`}>
+      <span>{compact ? getCompactTrustLabel(place) : sourceBadge.label}</span>
+      <small>{compact ? reliability.label : `${reliability.label} · ${copy}`}</small>
+    </div>
+  )
+}
+
+function getPlaceSourceBadge(place: Place) {
+  if (place.externalUrl || place.id < 0) return { type: 'kakao', label: '카카오 검색' }
+  if (place.source === 'user') return { type: 'user', label: '사용자 제보' }
+  return { type: 'operator', label: '운영자 추천' }
+}
+
+function getCompactTrustLabel(place: Place) {
+  const sourceBadge = getPlaceSourceBadge(place)
+  if (sourceBadge.type === 'operator') return '운영자 확인'
+  if (sourceBadge.type === 'kakao') return '카카오 검색'
+  return place.approvalStatus === 'approved' ? '제보 승인' : '제보 검수중'
+}
+
+function needsFieldCheck(value: string | undefined) {
+  if (!value) return true
+  return ['확인 필요', '방문 전', '사용자 제보', '검토 전'].some((keyword) => value.includes(keyword))
+}
+
+function getPlaceReliability(place: Place) {
+  const sourceBadge = getPlaceSourceBadge(place)
+  const phoneNeedsCheck = needsFieldCheck(place.phone)
+  const hoursNeedsCheck = needsFieldCheck(place.hours)
+  const verifiedAt = place.lastVerifiedAt
+    || (place.externalUrl || place.id < 0
+      ? '카카오 Local 검색 시점'
+      : place.source === 'user'
+        ? '사용자 제보 검토 전'
+        : '운영자 등록 정보')
+  const cautionCount = Number(phoneNeedsCheck) + Number(hoursNeedsCheck) + (place.source === 'user' ? 1 : 0)
+  const tone = cautionCount === 0 ? 'high' : cautionCount === 1 ? 'medium' : 'low'
+  const label = tone === 'high' ? '확인 안정' : tone === 'medium' ? '일부 확인 필요' : '방문 전 확인'
+
+  return {
+    label,
+    tone,
+    sourceLabel: sourceBadge.label,
+    phoneLabel: phoneNeedsCheck ? '전화 확인 필요' : '전화 확인됨',
+    hoursLabel: hoursNeedsCheck ? '운영시간 확인 필요' : '운영시간 확인됨',
+    verifiedAt,
+    history: place.reviewHistory || [],
+  }
+}
+
+function PlaceReliabilityStrip({ reliability, compact = false }: { reliability: ReturnType<typeof getPlaceReliability>; compact?: boolean }) {
+  return (
+    <div className={`place-reliability-strip ${compact ? 'compact' : ''} ${reliability.tone}`} aria-label="장소 정보 신뢰도">
+      <span>{reliability.label}</span>
+      <small>{reliability.phoneLabel}</small>
+      <small>{reliability.hoursLabel}</small>
+      <small>최근 확인: {reliability.verifiedAt}</small>
+    </div>
+  )
+}
+
+function getPlaceDirectionsUrl(place: Place) {
+  if (place.directionsUrl) return place.directionsUrl
+  if (Number.isFinite(place.lat) && Number.isFinite(place.lng)) {
+    return `https://map.kakao.com/link/to/${encodeURIComponent(place.name)},${place.lat},${place.lng}`
+  }
+  return `https://map.kakao.com/?q=${encodeURIComponent(`${place.name} ${place.address}`)}`
+}
+
+function isMobileMapTarget() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(max-width: 760px), (pointer: coarse)').matches
+    || /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)
+}
+
+function openPlaceDirections(place: Place, event?: MouseEvent<HTMLElement>) {
+  event?.preventDefault()
+  event?.stopPropagation()
+
+  if (typeof window === 'undefined') return
+  const directionsUrl = getPlaceDirectionsUrl(place)
+
+  if (isMobileMapTarget()) {
+    window.location.href = directionsUrl
+    return
+  }
+
+  const popup = window.open(directionsUrl, '_blank', 'noopener,noreferrer')
+  if (!popup) {
+    window.location.href = directionsUrl
+  }
 }
 
 function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect: (region: string) => void; onClose: () => void }) {
@@ -3203,8 +4351,8 @@ function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect
         <div className="sheet-header">
           <div>
             <p className="eyebrow">지역 필터</p>
-            <h3>어느 지역의 도움 장소를 볼까요?</h3>
-            <p className="region-sheet-copy">지역을 선택하면 지도 마커와 장소 목록이 해당 권역 기준으로 바뀝니다.</p>
+            <h3>지도 기준을 선택하세요</h3>
+            <p className="region-sheet-copy">전체 지역은 권역 흐름을, 개별 지역은 실제 장소 목록을 중심으로 보여줍니다.</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="닫기">×</button>
         </div>
@@ -3212,7 +4360,7 @@ function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect
           <MapPin size={17} />
           <div>
             <strong>{currentRegion ? `${currentRegion.region1} ${currentRegion.region2}` : current}</strong>
-            <span>병원, 약국, 상담기관, 송금, 행정기관을 먼저 보여줍니다.</span>
+            <span>{current === '전체 지역' ? '전국 외국인 밀집 생활권을 먼저 보여줍니다.' : '병원, 약국, 상담기관, 송금, 행정기관을 먼저 보여줍니다.'}</span>
           </div>
         </div>
         <div className="region-list" aria-label="지역 목록">
@@ -3221,7 +4369,7 @@ function RegionSheet({ current, onSelect, onClose }: { current: string; onSelect
               <span className="region-option-pin"><MapPin size={15} /></span>
               <span className="region-option-copy">
                 <strong>{region.region1} {region.region2}</strong>
-                <small>{region.value === '충북 오창' ? '오창읍 주변 샘플 지도' : '지역 기준 장소 보기'}</small>
+                <small>{region.value === '전체 지역' ? '전국 권역 한눈에 보기' : region.value === '충북 도청' ? '내 위치 목업 기준 주변 장소' : region.value === '충북 오창' ? '오창읍 주변 샘플 지도' : '선택 지역 장소만 보기'}</small>
               </span>
               <ChevronRight size={15} />
             </button>
@@ -3239,7 +4387,7 @@ function LocationPermissionModal({ onSelect, onClose }: { onSelect: (mode: 'whil
       <section className="location-permission-modal" role="dialog" aria-modal="true" aria-label="위치 권한 선택" onClick={(event) => event.stopPropagation()}>
         <div className="location-permission-icon"><MapPin size={24} /></div>
         <h3>WorkHere Korea에서 현재 위치를 사용하도록 허용할까요?</h3>
-        <p>가까운 병원, 약국, 상담기관과 행정기관을 현재 위치 기준으로 보여드립니다.</p>
+        <p>허용하면 실제 GPS 좌표 기준으로 가까운 병원, 약국, 상담기관과 행정기관을 검색합니다. 거부하면 선택한 지역 기준을 유지합니다.</p>
         <div className="location-permission-actions">
           <button className="primary-button" type="button" onClick={() => onSelect('whileUsing')}>앱을 사용하는 동안 허용</button>
           <button className="secondary-button" type="button" onClick={() => onSelect('once')}>한 번 허용</button>
@@ -3251,20 +4399,44 @@ function LocationPermissionModal({ onSelect, onClose }: { onSelect: (mode: 'whil
   )
 }
 
-function EmptyState({ title, description, actionLabel }: { title: string; description: string; actionLabel?: string }) {
+function EmptyState({
+  title,
+  description,
+  actionLabel,
+  actions,
+}: {
+  title: string
+  description: string
+  actionLabel?: string
+  actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'secondary' }>
+}) {
   return (
     <div className="empty-state-card">
       <MapPin size={22} />
       <strong>{title}</strong>
       <p>{description}</p>
-      {actionLabel ? <button className="secondary-button mini" type="button">{actionLabel}</button> : null}
+      {actions?.length ? (
+        <div className="empty-state-actions">
+          {actions.map((action) => (
+            <button
+              className={`${action.variant === 'primary' ? 'primary-button' : 'secondary-button'} mini`}
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : actionLabel ? <button className="secondary-button mini" type="button">{actionLabel}</button> : null}
     </div>
   )
 }
 
-function PlaceDetailScreen({ t, selectedPlace, feeds, posts, onBack, onSave, onReport, onFeed, onPost, onDirections }: { t: Record<string, string>; selectedPlace: Place; feeds: DailyFeed[]; posts: Post[]; onBack: () => void; onSave: () => void; onReport: () => void; onFeed: () => void; onPost: (post: Post) => void; onDirections: () => void }) {
+function PlaceDetailScreen({ t, profile, selectedPlace, feeds, posts, onBack, onSave, onReport, onFeed, onPost, onDirections }: { t: Record<string, string>; profile: UserProfile; selectedPlace: Place; feeds: DailyFeed[]; posts: Post[]; onBack: () => void; onSave: () => void; onReport: () => void; onFeed: () => void; onPost: (post: Post) => void; onDirections: () => void }) {
   const relatedFeeds = feeds.filter((feed) => selectedPlace.linkedFeedIds?.includes(feed.id) || feed.placeId === selectedPlace.id).slice(0, 3)
   const relatedPosts = posts.filter((post) => selectedPlace.linkedPostIds?.includes(post.id) || post.body.includes(selectedPlace.category) || post.title.includes(selectedPlace.category)).slice(0, 3)
+  const reliability = getPlaceReliability(selectedPlace)
 
   return (
     <DetailFrame title={t.placeDetail} back={onBack} backLabel={t.back}>
@@ -3282,16 +4454,23 @@ function PlaceDetailScreen({ t, selectedPlace, feeds, posts, onBack, onSave, onR
           </div>
           <InfoBox icon={<CheckCircle2 size={18} />} text={`${t.address}: ${selectedPlace.address}`} />
           <InfoBox icon={<ShieldCheck size={18} />} text={`${t.source}: ${selectedPlace.source === 'operator' ? t.operator : t.userTip} · ${selectedPlace.isOpen ? '현재 영업 중' : '방문 전 확인 필요'}`} />
+          <PlaceSourceTrust place={selectedPlace} />
         </article>
+        <Panel title="정보 신뢰도">
+          <PlaceReliabilityStrip reliability={reliability} />
+          <div className="place-reliability-history">
+            {(reliability.history.length ? reliability.history : ['확인 이력이 아직 없습니다.']).slice(0, 3).map((item) => <span key={item}>{item}</span>)}
+          </div>
+        </Panel>
         <Panel title="제공 서비스"><div className="chip-row">{(selectedPlace.services || []).map((service) => <span className="chip" key={service}>{service}</span>)}</div></Panel>
-        <Panel title={t.reviews}>{selectedPlace.reviews.length ? selectedPlace.reviews.map((review, index) => <ReviewLine key={review} review={review} index={index} />) : <p className="empty-text">No reviews yet</p>}</Panel>
+        <Panel title={t.reviews}>{selectedPlace.reviews.length ? selectedPlace.reviews.map((review, index) => <ReviewLine key={review} review={review} index={index} profile={profile} />) : <p className="empty-text">No reviews yet</p>}</Panel>
         <Panel title="관련 일상 피드">{relatedFeeds.length ? relatedFeeds.map((feed) => <ListButton key={feed.id} title={feed.body} meta={`${feed.author} · ${feed.region}`} onClick={onFeed} />) : <p className="empty-text">연결된 피드가 아직 없습니다.</p>}</Panel>
         <Panel title="관련 커뮤니티 질문">{relatedPosts.length ? relatedPosts.map((post) => <ListButton key={post.id} title={post.title} meta={`${post.category} · ${post.comments.length} 댓글`} onClick={() => onPost(post)} />) : <p className="empty-text">가까운 병원/상담기관 질문을 커뮤니티에서 연결할 수 있습니다.</p>}</Panel>
         <section className="detail-action-card">
           <div className="button-row">
-            <button className="secondary-button grow" onClick={onDirections} type="button"><MapPin size={18} />길찾기</button>
+            <button className="primary-button grow" onClick={onDirections} type="button"><MapPin size={18} />길찾기</button>
             <a className="secondary-button grow" href={`tel:${selectedPlace.phone}`}><Bell size={18} />전화하기</a>
-            <button className="primary-button grow" onClick={onSave} type="button"><Bookmark size={18} />{t.save}</button>
+            <button className="secondary-button grow" onClick={onSave} type="button"><Bookmark size={18} />{t.save}</button>
           </div>
           <button className="secondary-button danger stretch" onClick={onReport} type="button"><Flag size={18} />정보 수정 요청 / 신고</button>
         </section>
@@ -3309,6 +4488,7 @@ function profileForAuthor(author: string, authorId?: number, fallback?: ProfileU
 }
 
 function categoryClass(category: string) {
+  if (category.includes('밀집')) return 'dense'
   if (category.includes('병원')) return 'medical'
   if (category.includes('약국')) return 'pharmacy'
   if (category.includes('상담')) return 'support'
@@ -3404,6 +4584,7 @@ function DailyFeedCardV2({
   onJob,
   onHelp,
   onQuestion,
+  onOpenViewer,
 }: {
   feed: DailyFeed
   t: Record<string, string>
@@ -3420,13 +4601,14 @@ function DailyFeedCardV2({
   onJob: () => void
   onHelp: () => void
   onQuestion: () => void
+  onOpenViewer: (imageIndex: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
     <article className="daily-card feed-card">
       <FeedHeader feed={feed} t={t} onReport={onReport} onHide={onHide} />
-      <FeedCarousel feed={feed} />
+      <FeedCarousel feed={feed} onOpenViewer={onOpenViewer} />
       <FeedActions feed={feed} t={t} onLike={onLike} onComment={onComment} onSave={onSave} />
       <FeedCaption
         feed={feed}
@@ -4281,19 +5463,34 @@ function isImageAssetPath(value: string) {
   return value.startsWith('/') || value.startsWith('http') || value.startsWith('data:image')
 }
 
-function ReviewLine({ review, index }: { review: string; index: number }) {
-  const profile = getSampleUserById(index + 1) || getSampleUserForName(review, index)
+function getSampleUserForProfileNationality(profile: UserProfile, index: number) {
+  const countryCode = profileCountryCode(profile)
+  const offsets: Record<string, number[]> = {
+    VN: [1, 2, 3, 10],
+    CN: [4, 5, 6, 11],
+    UZ: [7, 8, 9, 12],
+  }
+  const ids = offsets[countryCode] || [1, 4, 7]
+  return getSampleUserById(ids[index % ids.length])
+}
+
+function ReviewLine({ review, index, profile }: { review: string; index: number; profile?: UserProfile }) {
+  const matchedProfile = profile ? getSampleUserForProfileNationality(profile, index) : undefined
+  const reviewProfile = matchedProfile || getSampleUserById(index + 1) || getSampleUserForName(review, index)
   return (
     <div className="review-line">
-      <ProfileIdentity user={profile} size="sm" />
+      <ProfileIdentity user={reviewProfile} size="sm" />
       <div className="review-copy">
+        <span className="review-meta">
+          {reviewProfile.countryName || '사용자'} · {reviewProfile.isCountryVerified ? '국적 인증' : '생활 후기'}
+        </span>
         <p>{review}</p>
       </div>
     </div>
   )
 }
 
-function FeedCarousel({ feed }: { feed: DailyFeed }) {
+function FeedCarousel({ feed, onOpenViewer }: { feed: DailyFeed; onOpenViewer?: (imageIndex: number) => void }) {
   const images = feed.images?.length ? feed.images : [{ id: 1, url: feed.image, alt: `${feed.author} daily life` }]
   const [activeIndex, setActiveIndex] = useState(0)
   const [touchStart, setTouchStart] = useState<number | null>(null)
@@ -4315,12 +5512,15 @@ function FeedCarousel({ feed }: { feed: DailyFeed }) {
         <div className="feed-track" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
           {images.map((image, index) => (
             <div className="feed-slide" key={`${feed.id}-${image.id}`}>
-              <img
-                src={assetUrl(image.url)}
-                alt={image.alt || `${feed.author} daily life ${index + 1}`}
-                loading={index === 0 ? 'eager' : 'lazy'}
-                decoding="async"
-              />
+              <button className="feed-slide-open" onClick={() => onOpenViewer?.(index)} type="button" aria-label={`${feed.author} 일상 사진 전체화면 보기`}>
+                <img
+                  src={assetUrl(image.url)}
+                  alt={image.alt || `${feed.author} daily life ${index + 1}`}
+                  loading={index === 0 ? 'eager' : 'lazy'}
+                  decoding="async"
+                />
+                <span>전체화면</span>
+              </button>
             </div>
           ))}
         </div>
@@ -4334,6 +5534,165 @@ function FeedCarousel({ feed }: { feed: DailyFeed }) {
       </div>
       {hasMultipleImages ? <FeedIndicator total={images.length} activeIndex={activeIndex} onSelect={goTo} /> : null}
     </div>
+  )
+}
+
+function DailyFeedFullscreenViewer({
+  feeds,
+  feedId,
+  imageIndex,
+  t,
+  translatedFeedIds,
+  places,
+  jobs,
+  onClose,
+  onChangeFeed,
+  onTranslate,
+  onLike,
+  onComment,
+  onSave,
+  onPlace,
+  onJob,
+  onHelp,
+  onQuestion,
+}: {
+  feeds: DailyFeed[]
+  feedId: number
+  imageIndex: number
+  t: Record<string, string>
+  translatedFeedIds: number[]
+  places: Place[]
+  jobs: Job[]
+  onClose: () => void
+  onChangeFeed: (feedId: number, imageIndex?: number) => void
+  onTranslate: (feed: DailyFeed) => void
+  onLike: (feed: DailyFeed) => void
+  onComment: (feed: DailyFeed) => void
+  onSave: (feed: DailyFeed) => void
+  onPlace: (feed: DailyFeed) => void
+  onJob: (feed: DailyFeed) => void
+  onHelp: () => void
+  onQuestion: (feed: DailyFeed) => void
+}) {
+  const activeFeedIndex = Math.max(0, feeds.findIndex((feed) => feed.id === feedId))
+  const feed = feeds[activeFeedIndex] || feeds[0]
+  const [activeImageIndex, setActiveImageIndex] = useState(imageIndex)
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    setActiveImageIndex(imageIndex)
+  }, [feed?.id, imageIndex])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+      if (event.key === 'ArrowUp') changeFeed(-1)
+      if (event.key === 'ArrowDown') changeFeed(1)
+      if (event.key === 'ArrowLeft') changeImage(-1)
+      if (event.key === 'ArrowRight') changeImage(1)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
+
+  if (!feed) return null
+
+  const images = feed.images?.length ? feed.images : [{ id: 1, url: feed.image, alt: `${feed.author} daily life` }]
+  const safeImageIndex = Math.min(Math.max(activeImageIndex, 0), images.length - 1)
+  const activeImage = images[safeImageIndex]
+  const translated = translatedFeedIds.includes(feed.id)
+  const place = places.find((item) => item.id === feed.placeId)
+  const job = jobs.find((item) => item.id === feed.jobId)
+  const body = translated ? feed.translatedBody : feed.body
+
+  function changeFeed(direction: -1 | 1) {
+    if (!feeds.length) return
+    const nextIndex = (activeFeedIndex + direction + feeds.length) % feeds.length
+    onChangeFeed(feeds[nextIndex].id, 0)
+  }
+
+  function changeImage(direction: -1 | 1) {
+    if (images.length <= 1) return
+    setActiveImageIndex((currentIndex) => (currentIndex + direction + images.length) % images.length)
+  }
+
+  function handleViewerTouchEnd(event: TouchEvent<HTMLElement>) {
+    if (!touchStart) return
+    const target = event.target as HTMLElement
+    if (target.closest('.daily-viewer-caption, .daily-viewer-actions, .feed-indicator, button')) {
+      setTouchStart(null)
+      return
+    }
+    const deltaX = event.changedTouches[0].clientX - touchStart.x
+    const deltaY = event.changedTouches[0].clientY - touchStart.y
+    const absX = Math.abs(deltaX)
+    const absY = Math.abs(deltaY)
+
+    if (absY > absX && absY > 58) {
+      changeFeed(deltaY < 0 ? 1 : -1)
+    } else if (absX > absY && absX > 46) {
+      changeImage(deltaX < 0 ? 1 : -1)
+    }
+    setTouchStart(null)
+  }
+
+  return createPortal(
+    <div
+      className="daily-viewer-overlay"
+      role="presentation"
+      onMouseDown={onClose}
+    >
+      <section
+        className="daily-viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="일상 사진 전체화면"
+        onMouseDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => setTouchStart({ x: event.touches[0].clientX, y: event.touches[0].clientY })}
+        onTouchEnd={handleViewerTouchEnd}
+      >
+        <header className="daily-viewer-topbar">
+          <div>
+            <strong>{feed.author}</strong>
+            <span>{activeFeedIndex + 1}/{feeds.length} · {feed.region} · {feed.createdAt}</span>
+          </div>
+          <button className="daily-viewer-close" onClick={onClose} type="button" aria-label="전체화면 닫기">×</button>
+        </header>
+
+        <div className="daily-viewer-stage">
+          <img src={assetUrl(activeImage.url)} alt={activeImage.alt || `${feed.author} daily life ${safeImageIndex + 1}`} />
+          {images.length > 1 ? <span className="daily-viewer-counter">{safeImageIndex + 1}/{images.length}</span> : null}
+        </div>
+
+        {images.length > 1 ? (
+          <FeedIndicator total={images.length} activeIndex={safeImageIndex} onSelect={setActiveImageIndex} />
+        ) : null}
+
+        <div className="daily-viewer-actions">
+          <button onClick={() => onLike(feed)} type="button" aria-label="Like feed"><Heart size={22} fill={feed.likes > 0 ? 'currentColor' : 'none'} /></button>
+          <button onClick={() => onComment(feed)} type="button" aria-label="Comment feed"><MessageCircle size={22} /></button>
+          <button type="button" aria-label="Share feed"><Send size={22} /></button>
+          <button className="daily-viewer-save" onClick={() => onSave(feed)} type="button" aria-label={t.save}><Bookmark size={22} fill={feed.saved ? 'currentColor' : 'none'} /></button>
+        </div>
+
+        <div className="daily-viewer-caption">
+          <strong>좋아요 {feed.likes.toLocaleString()} · 댓글 {feed.comments.length.toLocaleString()}</strong>
+          <p><b>{feed.author}</b> {body}</p>
+          <div className="feed-tags">
+            <span>{feed.category}</span>
+            {feed.hashtags.slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
+          </div>
+          <div className="feed-link-row">
+            <button onClick={() => onTranslate(feed)} type="button"><Languages size={16} />{t.translate}</button>
+            {place ? <button onClick={() => onPlace(feed)} type="button"><MapPin size={16} />{place.name}</button> : null}
+            {job ? <button onClick={() => onJob(feed)} type="button"><BriefcaseBusiness size={16} />{t.linkedJob}</button> : null}
+            {hasDangerKeyword(feed) ? <button className="danger" onClick={onHelp} type="button"><AlertTriangle size={16} />{t.askHelp}</button> : null}
+            {feed.category === dailyCategories[5] ? <button onClick={() => onQuestion(feed)} type="button"><MessageCircle size={16} />{t.shareQuestion}</button> : null}
+          </div>
+        </div>
+      </section>
+    </div>,
+    document.body,
   )
 }
 
@@ -4511,6 +5870,86 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function AdminTile({ icon: Icon, label, value, onClick }: { icon: typeof Home; label: string; value: string; onClick: () => void }) {
   return <button className="admin-tile" onClick={onClick} type="button"><Icon size={22} /><span>{label}</span><strong>{value}</strong></button>
+}
+
+function AdminPlaceModeration({
+  places,
+  onApprove,
+  onEdit,
+  onReject,
+  onSelect,
+}: {
+  places: Place[]
+  onApprove: (placeId: number) => void
+  onEdit: (event: React.FormEvent<HTMLFormElement>, placeId: number) => void
+  onReject: (placeId: number) => void
+  onSelect: (place: Place) => void
+}) {
+  const pendingCount = places.filter((place) => place.approvalStatus === 'pending').length
+  const approvedCount = places.filter((place) => place.approvalStatus === 'approved').length
+  const rejectedCount = places.filter((place) => place.approvalStatus === 'rejected').length
+
+  return (
+    <section className="admin-place-moderation">
+      <InfoBox icon={<ShieldCheck size={18} />} text="사용자 제보 장소는 승인 전 지도에 노출되지 않습니다. 운영자가 전화·주소·운영시간을 보정한 뒤 승인하면 생활지도 목록에 반영됩니다." />
+      <div className="admin-place-summary">
+        <span><strong>{pendingCount}</strong> 승인 대기</span>
+        <span><strong>{approvedCount}</strong> 지도 노출</span>
+        <span><strong>{rejectedCount}</strong> 반려</span>
+      </div>
+      {[...places].sort((a, b) => placeModerationRank(a) - placeModerationRank(b)).map((place) => {
+        const visibleOnMap = place.approvalStatus === 'approved'
+        const needsCheck = place.approvalStatus === 'pending' || place.source === 'user'
+
+        return (
+          <article className={`admin-place-card ${place.approvalStatus}`} key={place.id}>
+            <div className="admin-place-card-head">
+              <div>
+                <span>{place.source === 'user' ? '사용자 제보' : '운영자 등록'} · {place.category}</span>
+                <h3>{place.name}</h3>
+                <p>{place.region} · {place.address}</p>
+              </div>
+              <mark className={visibleOnMap ? 'approved' : place.approvalStatus}>{visibleOnMap ? '지도 노출중' : statusLabel[place.approvalStatus]}</mark>
+            </div>
+            <div className="admin-place-checklist" aria-label="장소 검수 체크">
+              <span className={place.phone.includes('확인 필요') ? 'warning' : 'ok'}>전화 {place.phone.includes('확인 필요') ? '확인 필요' : '확인됨'}</span>
+              <span className={place.address.includes('확인 필요') ? 'warning' : 'ok'}>주소 {place.address.includes('확인 필요') ? '확인 필요' : '확인됨'}</span>
+              <span className={place.hours.includes('확인 필요') ? 'warning' : 'ok'}>운영시간 {place.hours.includes('확인 필요') ? '확인 필요' : '확인됨'}</span>
+              <span className={needsCheck ? 'warning' : 'ok'}>{needsCheck ? '관리자 검수 필요' : '검수 완료'}</span>
+            </div>
+            <form className="admin-place-edit-form" onSubmit={(event) => onEdit(event, place.id)}>
+              <div className="form-grid">
+                <label>장소명<input name="name" defaultValue={place.name} /></label>
+                <label>카테고리<select name="category" defaultValue={place.category}>{lifeMapCategories.map((category) => <option key={category}>{category}</option>)}</select></label>
+                <label>지역<input name="region" defaultValue={place.region} /></label>
+                <label>전화<input name="phone" defaultValue={place.phone} /></label>
+                <label>운영시간<input name="hours" defaultValue={place.hours} /></label>
+                <label>서비스 태그<input name="services" defaultValue={(place.services || []).join(', ')} /></label>
+              </div>
+              <label>주소<input name="address" defaultValue={place.address} /></label>
+              <label>검수 메모<textarea name="memo" rows={2} defaultValue={place.approvalStatus === 'pending' ? '전화와 운영시간 확인 후 승인 예정' : '관리자 정보 보정'} /></label>
+              <div className="admin-place-history">
+                {(place.reviewHistory || ['검수 이력 없음']).slice(-4).map((item) => <span key={item}>{item}</span>)}
+              </div>
+              <div className="button-row">
+                <button className="secondary-button small" type="submit">수정 저장</button>
+                {place.approvalStatus !== 'approved' ? <button className="primary-button small" onClick={() => onApprove(place.id)} type="button">승인 후 지도 반영</button> : null}
+                <button className="secondary-button small" onClick={() => onSelect(place)} type="button">상세 확인</button>
+                <button className="secondary-button small danger" onClick={() => onReject(place.id)} type="button">반려</button>
+              </div>
+            </form>
+          </article>
+        )
+      })}
+    </section>
+  )
+}
+
+function placeModerationRank(place: Place) {
+  if (place.approvalStatus === 'pending') return 0
+  if (place.approvalStatus === 'rejected') return 1
+  if (place.source === 'user') return 2
+  return 3
 }
 
 function TabButton({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
