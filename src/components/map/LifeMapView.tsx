@@ -123,7 +123,7 @@ export function LifeMapView({ places, activePlace, region, isSearching = false, 
   const categoryCount = categorySummary(places).length
   const mapProvider = import.meta.env.VITE_MAP_PROVIDER
   const kakaoMapKey = import.meta.env.VITE_KAKAO_MAP_KEY || import.meta.env.VITE_MAP_API_KEY
-  const useKakaoMap = mapProvider === 'kakao' && Boolean(kakaoMapKey)
+  const useKakaoMap = Boolean(kakaoMapKey) && mapProvider !== 'static'
 
   if (useKakaoMap) {
     return (
