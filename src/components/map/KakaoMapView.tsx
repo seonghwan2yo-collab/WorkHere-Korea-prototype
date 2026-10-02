@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { MapPin, Route } from 'lucide-react'
+import { List, MapPin, Maximize, Route } from 'lucide-react'
 import { initialDailyFeeds, initialPosts } from '../../data'
 import type { Place } from '../../types'
 
@@ -62,9 +62,6 @@ declare global {
     kakao?: KakaoGlobal
   }
 
-  interface WindowEventMap {
-    'workhere-cluster-select': CustomEvent<string>
-  }
 }
 
 let kakaoSdkPromise: Promise<KakaoGlobal> | null = null
@@ -189,11 +186,12 @@ function markerCategory(place: Place): MarkerCategory {
   return { key: 'community', label: '커뮤니티', shortLabel: '커뮤' }
 }
 
-function createMarkerContent(place: Place, active: boolean, onSelect: (place: Place) => void) {
+function createMarkerContent(place: Place, active: boolean) {
   const category = markerCategory(place)
   const button = document.createElement('button')
   button.type = 'button'
   button.className = `kakao-place-marker ${category.key} ${active ? 'active' : ''}`
+  button.dataset.placeId = String(place.id)
   button.setAttribute('aria-label', `${place.name} 선택`)
   button.title = place.name
 
@@ -207,24 +205,15 @@ function createMarkerContent(place: Place, active: boolean, onSelect: (place: Pl
 
   button.appendChild(badge)
   button.appendChild(label)
-  const handleSelect = (event: MouseEvent | PointerEvent | TouchEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    onSelect(place)
-  }
-  button.addEventListener('click', handleSelect)
-  button.addEventListener('pointerdown', handleSelect)
-  button.addEventListener('touchstart', handleSelect, { passive: false })
 
   return button
 }
 
-function createClusterContent(cluster: PlaceCluster, onSelect: (cluster: PlaceCluster) => void) {
+function createClusterContent(cluster: PlaceCluster) {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = `kakao-place-cluster ${cluster.kind === 'region' ? 'region-cluster' : ''}`
   button.dataset.clusterId = cluster.id
-  button.setAttribute('onclick', "window.dispatchEvent(new CustomEvent('workhere-cluster-select', { detail: this.dataset.clusterId })); return false;")
   button.setAttribute('aria-label', `${cluster.label || '주변 장소'} ${cluster.places.length}개 장소 보기`)
   button.title = `${cluster.label || '주변 장소'} ${cluster.places.length}개`
 
@@ -239,49 +228,46 @@ function createClusterContent(cluster: PlaceCluster, onSelect: (cluster: PlaceCl
   button.appendChild(count)
   button.appendChild(label)
 
-  const handleSelect = (event: MouseEvent | PointerEvent | TouchEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    onSelect(cluster)
-  }
-  button.addEventListener('click', handleSelect)
-  button.addEventListener('pointerdown', handleSelect)
-  button.addEventListener('touchstart', handleSelect, { passive: false })
 
   return button
 }
 
 function loadKakaoSdk(appKey: string) {
-  if (window.kakao?.maps) return Promise.resolve(window.kakao)
+  if (window.kakao?.maps?.Map) return Promise.resolve(window.kakao)
   if (kakaoSdkPromise) return kakaoSdkPromise
 
-  kakaoSdkPromise = new Promise((resolve, reject) => {
+  kakaoSdkPromise = new Promise<KakaoGlobal>((resolve, reject) => {
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-workhere-kakao-map="true"]')
-    if (existingScript) {
-      existingScript.addEventListener('load', () => {
-        if (!window.kakao?.maps) {
-          reject(new Error('Kakao Maps SDK loaded without maps API.'))
-          return
-        }
-        window.kakao.maps.load(() => resolve(window.kakao as KakaoGlobal))
-      }, { once: true })
-      existingScript.addEventListener('error', () => reject(new Error('Failed to load Kakao Maps SDK.')), { once: true })
-      return
-    }
-
-    const script = document.createElement('script')
-    script.async = true
-    script.dataset.workhereKakaoMap = 'true'
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false&libraries=services`
-    script.addEventListener('load', () => {
+    const script = existingScript || document.createElement('script')
+    const timeout = window.setTimeout(() => reject(new Error('Kakao Maps SDK connection timed out.')), 20000)
+    const loadMaps = () => {
       if (!window.kakao?.maps) {
+        window.clearTimeout(timeout)
         reject(new Error('Kakao Maps SDK loaded without maps API.'))
         return
       }
-      window.kakao.maps.load(() => resolve(window.kakao as KakaoGlobal))
+      window.kakao.maps.load(() => {
+        window.clearTimeout(timeout)
+        resolve(window.kakao as KakaoGlobal)
+      })
+    }
+    if (window.kakao?.maps) {
+      loadMaps()
+      return
+    }
+    script.async = true
+    script.dataset.workhereKakaoMap = 'true'
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false&libraries=services`
+    script.addEventListener('load', loadMaps, { once: true })
+    script.addEventListener('error', () => {
+      window.clearTimeout(timeout)
+      reject(new Error('Failed to load Kakao Maps SDK.'))
     }, { once: true })
-    script.addEventListener('error', () => reject(new Error('Failed to load Kakao Maps SDK.')), { once: true })
-    document.head.appendChild(script)
+    if (!existingScript) document.head.appendChild(script)
+  }).catch((error) => {
+    kakaoSdkPromise = null
+    document.querySelector('script[data-workhere-kakao-map="true"]')?.remove()
+    throw error
   })
 
   return kakaoSdkPromise
@@ -420,7 +406,9 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<KakaoMap | null>(null)
   const markerRefs = useRef<KakaoCustomOverlay[]>([])
+  const gestureRef = useRef<{ x: number; y: number; moved: boolean; button: HTMLButtonElement | null; selected: boolean } | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [retryCount, setRetryCount] = useState(0)
   const [renderedMarkerCount, setRenderedMarkerCount] = useState(0)
   const [clusterCount, setClusterCount] = useState(0)
   const [selectedCluster, setSelectedCluster] = useState<PlaceCluster | null>(null)
@@ -444,6 +432,7 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
     if (!appKey || !containerRef.current) return
 
     let cancelled = false
+    setStatus('loading')
 
     loadKakaoSdk(appKey)
       .then((kakao) => {
@@ -457,7 +446,9 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
         setMapLevel(map.getLevel())
         setStatus('ready')
       })
-      .catch(() => setStatus('error'))
+      .catch(() => {
+        if (!cancelled) setStatus('error')
+      })
 
     return () => {
       cancelled = true
@@ -465,7 +456,7 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
       markerRefs.current = []
       mapRef.current = null
     }
-  }, [appKey])
+  }, [appKey, retryCount])
 
   useEffect(() => {
     if (!window.kakao?.maps || !mapRef.current || status !== 'ready') return
@@ -493,14 +484,13 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
       })
     }
 
-    window.addEventListener('scroll', relayoutVisibleMap, { passive: true })
-    window.addEventListener('resize', relayoutVisibleMap)
+    const observer = new ResizeObserver(relayoutVisibleMap)
+    if (containerRef.current) observer.observe(containerRef.current)
     relayoutVisibleMap()
 
     return () => {
       window.cancelAnimationFrame(frameId)
-      window.removeEventListener('scroll', relayoutVisibleMap)
-      window.removeEventListener('resize', relayoutVisibleMap)
+      observer.disconnect()
     }
   }, [status])
 
@@ -587,9 +577,6 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
     const kakao = window.kakao
     const map = mapRef.current
     markerRefs.current.forEach((marker) => marker.setMap(null))
-    const handleClusterSelect = (cluster: PlaceCluster) => {
-      setSelectedCluster(cluster)
-    }
 
     markerRefs.current = placeClusters
       .map((cluster) => {
@@ -598,8 +585,8 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
         const marker = new kakao.maps.CustomOverlay({
           clickable: true,
           content: isCluster
-            ? createClusterContent(cluster, handleClusterSelect)
-            : createMarkerContent(place, activePlace?.id === place.id, onSelect),
+            ? createClusterContent(cluster)
+            : createMarkerContent(place, activePlace?.id === place.id),
           map,
           position: new kakao.maps.LatLng(cluster.lat, cluster.lng),
           xAnchor: 0.5,
@@ -613,7 +600,7 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
     map.relayout()
     setRenderedMarkerCount(placeClusters.reduce((count, cluster) => count + cluster.places.length, 0))
     setClusterCount(placeClusters.filter((cluster) => cluster.kind === 'region' || cluster.places.length > 1).length)
-  }, [activePlace?.id, onSelect, placeClusters, status])
+  }, [activePlace?.id, placeClusters, status])
 
   useEffect(() => {
     setSelectedCluster(null)
@@ -623,43 +610,63 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
     const frame = frameRef.current
     if (!frame) return
 
-    const openClusterById = (clusterId: string | undefined) => {
-      if (!clusterId) return false
-      const cluster = placeClusters.find((item) => item.id === clusterId)
-      if (!cluster) return false
-
-      setSelectedCluster(cluster)
-      return true
-    }
-
-    const handleClusterEvent = (event: Event) => {
+    const beginGesture = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null
-      const clusterButton = target?.closest<HTMLButtonElement>('.kakao-place-cluster')
-      if (!openClusterById(clusterButton?.dataset.clusterId)) return
-
-      event.preventDefault()
-      event.stopPropagation()
+      gestureRef.current = { x: event.clientX, y: event.clientY, moved: false, button: target?.closest<HTMLButtonElement>('.kakao-place-cluster, .kakao-place-marker') || null, selected: false }
     }
-
-    const handleClusterWindowEvent = (event: WindowEventMap['workhere-cluster-select']) => {
-      if (openClusterById(event.detail)) {
-        event.preventDefault()
-        event.stopPropagation()
+    const moveGesture = (event: PointerEvent) => {
+      const gesture = gestureRef.current
+      if (!gesture) return
+      if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8) {
+        gesture.moved = true
       }
     }
-
-    frame.addEventListener('click', handleClusterEvent, true)
-    frame.addEventListener('pointerdown', handleClusterEvent, true)
-    frame.addEventListener('touchstart', handleClusterEvent, { capture: true, passive: false })
-    window.addEventListener('workhere-cluster-select', handleClusterWindowEvent)
+    const cancelGesture = () => {
+      const gesture = gestureRef.current
+      if (gesture) gesture.moved = true
+    }
+    const selectButton = (button: HTMLButtonElement) => {
+      const cluster = placeClusters.find((item) => item.id === button.dataset.clusterId)
+      if (cluster) setSelectedCluster(cluster)
+      else {
+        const place = places.find((item) => String(item.id) === button.dataset.placeId)
+        if (place) onSelect(place)
+      }
+    }
+    const endGesture = (event: PointerEvent) => {
+      moveGesture(event)
+      const gesture = gestureRef.current
+      const target = event.target as HTMLElement | null
+      if (!gesture?.button || gesture.moved || target?.closest('.kakao-place-cluster, .kakao-place-marker') !== gesture.button) return
+      gesture.selected = true
+      event.preventDefault()
+      event.stopPropagation()
+      selectButton(gesture.button)
+    }
+    // A map pan can end on a marker; only an intentional tap should select it.
+    const guardMarkerClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      const button = target?.closest<HTMLButtonElement>('.kakao-place-cluster, .kakao-place-marker')
+      if (!button) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.detail !== 0 && (gestureRef.current?.moved || gestureRef.current?.selected)) return
+      selectButton(button)
+    }
+    frame.addEventListener('pointerdown', beginGesture, true)
+    frame.addEventListener('pointermove', moveGesture, true)
+    frame.addEventListener('pointerup', endGesture, true)
+    frame.addEventListener('pointercancel', cancelGesture, true)
+    frame.addEventListener('click', guardMarkerClick, true)
 
     return () => {
-      frame.removeEventListener('click', handleClusterEvent, true)
-      frame.removeEventListener('pointerdown', handleClusterEvent, true)
-      frame.removeEventListener('touchstart', handleClusterEvent, true)
-      window.removeEventListener('workhere-cluster-select', handleClusterWindowEvent)
+      frame.removeEventListener('pointerdown', beginGesture, true)
+      frame.removeEventListener('pointermove', moveGesture, true)
+      frame.removeEventListener('pointerup', endGesture, true)
+      frame.removeEventListener('pointercancel', cancelGesture, true)
+      frame.removeEventListener('click', guardMarkerClick, true)
     }
-  }, [placeClusters])
+  }, [placeClusters, places, onSelect])
 
   useEffect(() => {
     if (!window.kakao?.maps || !mapRef.current || status !== 'ready') return
@@ -724,17 +731,20 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
           <div className={`kakao-map-status ${status}`}>
             <strong>{status === 'loading' ? '카카오 지도를 불러오는 중입니다' : '카카오 지도를 불러오지 못했습니다'}</strong>
             <span>{status === 'loading' ? '지도 SDK 연결을 준비하고 있습니다.' : '도메인 등록과 JavaScript 키를 확인해주세요.'}</span>
-          </div>
-        ) : null}
-        {status === 'ready' ? (
-          <div className={`kakao-map-marker-status ${region === '전체 지역' ? 'overview' : ''}`} aria-live="polite">
-            <strong>{selectedCluster ? `${selectedCluster.label || '묶음 장소'} ${selectedCluster.places.length}곳` : activePlace ? activePlace.name : region === '전체 지역' ? `전국 권역 ${clusterCount}곳` : `지도 장소 ${renderedMarkerCount}곳`}</strong>
-            <span>{selectedCluster ? '아래 목록과 연결해 확인할 수 있습니다' : activePlace ? `${activePlace.category} · ${activePlace.distanceKm?.toFixed(1) || '-'}km` : region === '전체 지역' ? `${clusterCount}개 지역 묶음으로 정리했습니다` : clusterCount ? `가까운 장소는 ${clusterCount}개 묶음으로 정리했습니다` : '마커를 선택하면 장소 카드가 열립니다'}</span>
-            {onFocusList ? <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); showMapToast('아래 장소 목록으로 이동합니다'); onFocusList() }}>목록 보기</button> : null}
-            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); fitMapToPlaces() }}>전체 보기</button>
+            {status === 'error' ? <button type="button" className="secondary" onClick={() => setRetryCount((count) => count + 1)}>다시 연결</button> : null}
           </div>
         ) : null}
         {mapToast ? <div className="kakao-map-toast" aria-live="polite">{mapToast}</div> : null}
+      </div>
+      {status === 'ready' ? (
+        <div className="kakao-map-footer" aria-live="polite">
+          <strong>{selectedCluster ? `${selectedCluster.label || '묶음 장소'} ${selectedCluster.places.length}곳` : activePlace ? activePlace.name : region === '전체 지역' ? `전국 권역 ${clusterCount}곳` : `지도 장소 ${renderedMarkerCount}곳`}</strong>
+          <div className="kakao-map-footer-actions">
+            {onFocusList ? <button type="button" onClick={onFocusList}><List size={16} />목록 보기</button> : null}
+            <button type="button" onClick={fitMapToPlaces}><Maximize size={16} />전체 보기</button>
+          </div>
+        </div>
+      ) : null}
         {selectedCluster ? (
           <div className="kakao-cluster-panel" aria-label="묶음 장소 목록">
             <div className="kakao-cluster-panel-head">
@@ -796,7 +806,6 @@ export function KakaoMapView({ places, activePlace, region, isSearching = false,
             </div>
           </div>
         ) : null}
-      </div>
       <figcaption>카카오 지도 SDK 기반 실제 지도 영역입니다. 장소 데이터는 현재 MVP 데이터를 마커로 표시합니다.</figcaption>
     </figure>
   )

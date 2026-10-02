@@ -469,7 +469,7 @@ function App() {
   const visibleFeeds = dailyFeeds.filter((feed) => !feed.deleted && !feed.hidden)
   const visibleCommunityGroups = communityGroups.filter((group) => !group.hidden)
   const approvedJobs = jobs.filter((job) => job.approvalStatus === 'approved' && !job.hidden && !job.deleted)
-  const approvedPlaces = places.filter((place) => place.approvalStatus === 'approved')
+  const approvedPlaces = useMemo(() => places.filter((place) => place.approvalStatus === 'approved'), [places])
   const jobRegionOptions = flattenJobRegions(jobRegions)
   const selectedJobVisaType = selectedJobVisaTypes[0] || 'UNKNOWN'
   const selectedRegionLabels = selectedJobRegionCodes
@@ -491,11 +491,12 @@ function App() {
     : placeRegionKeyword === '충북 도청'
       ? '충북'
       : placeRegionKeyword
-  const filteredPlaces = approvedPlaces
+  const filteredPlaces = useMemo(() => approvedPlaces
     .filter((place) => placeFilters.includes(place.category) || (placeRegionKeyword === '전체 지역' && place.category === '외국인 밀집지역'))
     .filter((place) => !placeRegionFilterKeyword || `${place.region} ${place.address}`.includes(placeRegionFilterKeyword))
     .filter((place) => placeLanguageFilter === 'all' || place.languages.includes(placeLanguageFilter))
-    .sort((a, b) => (a.distanceKm || 99) - (b.distanceKm || 99))
+    .sort((a, b) => (a.distanceKm || 99) - (b.distanceKm || 99)),
+  [approvedPlaces, placeFilters, placeRegionKeyword, placeRegionFilterKeyword, placeLanguageFilter])
   const filteredFeeds = filterDailyFeeds(visibleFeeds, dailyFilter, profile, currentUserId)
   const filteredCommunityGroups = filterCommunityGroups(visibleCommunityGroups, communityFilters)
   const selectedGroupBoards = communityBoards
@@ -3099,11 +3100,11 @@ function LifeMapScreen({
     () => filteredPlaces.filter((place) => placeMatchesLifeMapRegion(place, effectiveRegion, hasGpsLocation)),
     [effectiveRegion, filteredPlaces, hasGpsLocation],
   )
-  const fallbackSearchedPlaces = regionPlaces.filter((place) => {
+  const fallbackSearchedPlaces = useMemo(() => regionPlaces.filter((place) => {
     const keyword = mapSearch.trim()
     if (!keyword) return true
     return `${place.name} ${place.category} ${place.services?.join(' ')}`.includes(keyword)
-  })
+  }), [regionPlaces, mapSearch])
   const searchedPlaces = lifeMapSearchPlaces ?? fallbackSearchedPlaces
   const searchedPlacesByRegion = useMemo(
     () => searchedPlaces.filter((place) => placeMatchesLifeMapRegion(place, effectiveRegion, hasGpsLocation)),

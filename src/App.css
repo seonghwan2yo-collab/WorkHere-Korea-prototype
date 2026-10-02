@@ -4711,14 +4711,15 @@ textarea {
 
 .kakao-map-view {
   margin: 0;
+  min-width: 0;
   display: grid;
   gap: 8px;
 }
 
 .kakao-map-frame {
   position: relative;
-  min-height: 0;
-  min-height: clamp(430px, 58vh, 720px);
+  min-width: 0;
+  min-height: clamp(430px, 58svh, 720px);
   aspect-ratio: 1 / 1.08;
   overflow: hidden;
   border: 1px solid rgba(11, 74, 139, 0.12);
@@ -4851,6 +4852,47 @@ textarea {
 .kakao-map-canvas {
   position: absolute;
   inset: 0;
+}
+
+.kakao-map-footer {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.kakao-map-footer > strong {
+  flex: 1 1 90px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.kakao-map-footer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.kakao-map-footer-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: inherit;
+  background: var(--color-card);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .kakao-map-header {
@@ -5403,10 +5445,8 @@ textarea {
 }
 
 .kakao-cluster-panel {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 62px;
+  position: relative;
+  min-width: 0;
   z-index: 5;
   padding: 12px;
   border: 1px solid rgba(196, 230, 255, 0.26);
@@ -5435,6 +5475,22 @@ textarea {
     0 9px 16px rgba(3, 12, 24, 0.24),
     0 0 0 4px rgba(21, 143, 129, 0.13),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.kakao-place-cluster,
+.kakao-place-marker {
+  pointer-events: none;
+}
+
+.kakao-place-cluster-count,
+.kakao-place-cluster-label,
+.kakao-place-marker-badge,
+.kakao-place-marker-label {
+  pointer-events: auto;
+}
+
+.kakao-map-frame.overview-mode .kakao-place-cluster.region-cluster {
+  min-height: 44px;
 }
 
 .kakao-map-frame.overview-mode .kakao-place-cluster.region-cluster .kakao-place-cluster-count::after {
@@ -9915,7 +9971,7 @@ textarea {
 
   .static-map-image-wrap,
   .kakao-map-frame {
-    min-height: min(78vh, 690px);
+    min-height: min(64svh, 560px);
     aspect-ratio: auto;
     border-radius: 20px;
   }
@@ -10001,8 +10057,7 @@ textarea {
   }
 
   .kakao-cluster-panel {
-    bottom: calc(var(--bottom-tab-height) + var(--bottom-tab-safe-area) + 86px);
-    max-height: min(42vh, 340px);
+    max-height: none;
   }
 
   .kakao-map-toast {
