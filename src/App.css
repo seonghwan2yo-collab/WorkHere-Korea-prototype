@@ -372,13 +372,6 @@ button {
   background: var(--app-soft-blue-bg);
   background-attachment: fixed;
   overflow: hidden;
-  transition: min-height 0.22s ease, padding 0.22s ease, gap 0.22s ease;
-}
-
-.topbar-search-hidden {
-  min-height: 60px;
-  gap: 0;
-  padding-bottom: 8px;
 }
 
 .topbar-main {
@@ -500,19 +493,12 @@ textarea {
   overflow: hidden;
   transform: translateY(0);
   transition:
-    max-height 0.22s ease,
-    min-height 0.22s ease,
     opacity 0.18s ease,
-    padding 0.22s ease,
     border-color 0.18s ease,
     transform 0.22s ease;
 }
 
 .topbar-search-hidden .topbar-search {
-  min-height: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
   border-color: transparent;
   opacity: 0;
   pointer-events: none;
@@ -9495,12 +9481,6 @@ textarea {
     gap: 8px;
     margin-inline: -8px;
     padding: 8px 16px 10px;
-  }
-
-  .topbar-search-hidden {
-    min-height: 52px;
-    padding-top: 6px;
-    padding-bottom: 6px;
   }
 
   .topbar-main {
