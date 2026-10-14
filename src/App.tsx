@@ -2877,18 +2877,16 @@ function HeroSection({ t, onStart }: { t: Record<string, string>; onStart: () =>
   return (
     <section className="splash">
       <div className="splash-copy">
-        <HeroBadge />
-        <img className="splash-logo" src={workhereLogo} alt={t.appName} />
+        <div className="splash-brand">
+          <img className="splash-logo" src={workhereLogo} alt={t.appName} />
+          <span className="hero-badge">BETA</span>
+        </div>
         <p>{t.splashLine}</p>
         <HeroCTA label={t.start} onClick={onStart} />
       </div>
       <HeroFeatureList features={features} onFeatureClick={onStart} />
     </section>
   )
-}
-
-function HeroBadge() {
-  return <p className="hero-badge">WorkHere Korea Beta</p>
 }
 
 function HeroCTA({ label, onClick }: { label: string; onClick: () => void }) {

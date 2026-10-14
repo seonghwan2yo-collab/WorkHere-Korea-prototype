@@ -162,8 +162,8 @@
 
 @media (max-width: 640px) {
   .theme-dark .splash {
-    background-size: cover, min(116vw, 560px) auto, cover, cover;
-    background-position: center, 50% 2%, center, center;
+    background-size: cover, min(92vw, 560px) auto, cover, cover;
+    background-position: center, center top, center, center;
   }
 }
 
@@ -663,7 +663,22 @@ textarea {
   letter-spacing: 0;
 }
 
+.splash-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.splash-brand .hero-badge {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
 .splash-logo {
+  min-width: 0;
+  max-width: calc(100% - 70px);
   width: min(420px, 88vw);
   height: auto;
   display: block;
@@ -673,7 +688,7 @@ textarea {
 .splash-copy p {
   max-width: 520px;
   color: rgba(8, 53, 101, 0.74);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .splash-copy .hero-badge {
@@ -9401,8 +9416,8 @@ textarea {
     padding: min(36svh, 300px) 18px calc(24px + env(safe-area-inset-bottom));
     align-content: start;
     gap: 18px;
-    background-size: min(116vw, 560px) auto, cover, cover, cover;
-    background-position: 50% 2%, center, center, center;
+    background-size: min(92vw, 560px) auto, cover, cover, cover;
+    background-position: center top, center, center, center;
   }
 
   .splash-copy {
@@ -9425,7 +9440,7 @@ textarea {
   .splash-copy p {
     max-width: 100%;
     color: rgba(8, 53, 101, 0.82);
-    font-size: clamp(16px, 4.1vw, 18px);
+    font-size: 14px;
     line-height: 1.38;
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
   }
@@ -10317,8 +10332,8 @@ textarea {
   .splash {
     padding-inline: 14px;
     padding-top: min(34svh, 270px);
-    background-size: min(116vw, 470px) auto, cover, cover, cover;
-    background-position: 50% 1%, center, center, center;
+    background-size: min(92vw, 470px) auto, cover, cover, cover;
+    background-position: center top, center, center, center;
   }
 
   .splash-copy {
