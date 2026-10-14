@@ -47,6 +47,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import workhereLogo from './assets/workhere-logo.png'
+import welcomePeople from './assets/main-landing-people-transparent.png'
 import {
   initialAdminLogs,
   initialAdminReports,
@@ -2876,10 +2877,11 @@ function HeroSection({ t, onStart }: { t: Record<string, string>; onStart: () =>
 
   return (
     <section className="splash">
+      <span className="hero-badge splash-beta">BETA</span>
+      <img className="splash-people" src={welcomePeople} alt="" />
       <div className="splash-copy">
         <div className="splash-brand">
           <img className="splash-logo" src={workhereLogo} alt={t.appName} />
-          <span className="hero-badge">BETA</span>
         </div>
         <p>{t.splashLine}</p>
         <HeroCTA label={t.start} onClick={onStart} />

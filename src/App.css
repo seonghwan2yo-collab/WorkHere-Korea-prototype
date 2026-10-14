@@ -623,6 +623,7 @@ textarea {
 }
 
 .splash {
+  position: relative;
   min-height: 100svh;
   padding: 36px 20px;
   color: #083565;
@@ -671,6 +672,20 @@ textarea {
   min-width: 0;
 }
 
+.splash-people {
+  display: none;
+}
+
+.splash-beta {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 18px;
+  z-index: 3;
+  margin: 0;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
 .splash-brand .hero-badge {
   flex: 0 0 auto;
   margin: 0;
@@ -678,7 +693,7 @@ textarea {
 
 .splash-logo {
   min-width: 0;
-  max-width: calc(100% - 70px);
+  max-width: 100%;
   width: min(420px, 88vw);
   height: auto;
   display: block;
@@ -1361,6 +1376,98 @@ textarea {
   color: #06111d;
   background: rgba(216, 237, 255, 0.94);
   border-color: rgba(216, 237, 255, 0.72);
+}
+
+@media (max-width: 759px) {
+  section.splash {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 16px;
+    padding: calc(56px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+    background-size: 0 0, cover, cover, cover;
+  }
+
+  .theme-dark section.splash {
+    background-size: cover, 0 0, cover, cover;
+  }
+
+  .splash-people {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: min(48svh, max(140px, calc(100svh - 408px)));
+    aspect-ratio: 4 / 3;
+    object-fit: contain;
+    object-position: center;
+  }
+
+  .splash .splash-copy {
+    max-width: 100%;
+    gap: 8px;
+    padding: 0;
+  }
+
+  .splash .splash-logo {
+    width: 204px;
+  }
+
+  .splash .splash-copy p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .splash .hero-cta {
+    margin-top: 8px;
+    min-width: 108px;
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .splash .splash-device {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: min(100%, 340px);
+    min-height: 0;
+    gap: 8px;
+  }
+
+  .splash .hero-feature-point {
+    position: static;
+    justify-self: start;
+    flex-direction: row;
+    justify-content: flex-start;
+    min-width: 158px;
+    max-width: 100%;
+    width: fit-content;
+    min-height: 44px;
+    margin: 0;
+    padding: 6px 12px 6px 7px;
+    gap: 8px;
+    border-radius: 999px;
+  }
+
+  .splash .hero-feature-point.middle {
+    justify-self: end;
+  }
+
+  .splash .hero-feature-point span {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+  }
+
+  .splash .hero-feature-point svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .splash .hero-feature-point strong {
+    font-size: 13px;
+    white-space: nowrap;
+  }
 }
 
 .theme-dark .home-hero .eyebrow {
