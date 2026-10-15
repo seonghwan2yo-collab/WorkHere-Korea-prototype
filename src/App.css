@@ -682,8 +682,8 @@ textarea {
   left: 18px;
   z-index: 3;
   margin: 0;
-  padding: 5px 10px;
-  font-size: 11px;
+  padding: 4px 8px;
+  font-size: 10px;
 }
 
 .splash-brand .hero-badge {
@@ -1382,8 +1382,8 @@ textarea {
   section.splash {
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: 16px;
-    padding: calc(48px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+    gap: 12px;
+    padding: calc(40px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom));
     background-size: 0 0, cover, cover, cover;
   }
 
@@ -1397,7 +1397,7 @@ textarea {
     max-width: none;
     margin-inline: -16px;
     height: auto;
-    max-height: min(60svh, max(140px, calc(100svh - 360px)));
+    max-height: min(70svh, max(140px, calc(100svh - 312px - env(safe-area-inset-top) - env(safe-area-inset-bottom))));
     aspect-ratio: 4 / 3;
     object-fit: contain;
     object-position: center;
@@ -1405,35 +1405,35 @@ textarea {
 
   .splash .splash-copy {
     max-width: 100%;
-    gap: 8px;
+    gap: 6px;
     padding: 0;
   }
 
   .splash .splash-logo {
-    width: 204px;
+    width: 168px;
   }
 
   .splash .splash-copy p {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.4;
   }
 
   .splash .hero-cta {
-    margin-top: 8px;
-    min-width: 108px;
+    margin-top: 6px;
+    min-width: 96px;
     min-height: 44px;
-    padding: 10px 16px;
-    font-size: 14px;
+    padding: 8px 12px;
+    font-size: 13px;
   }
 
   .splash .splash-device {
-    margin-top: 8px;
+    margin-top: 4px;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    width: min(100%, 340px);
+    width: min(100%, 300px);
     min-height: 0;
-    gap: 8px;
+    gap: 6px;
   }
 
   .splash .hero-feature-point {
@@ -1441,13 +1441,13 @@ textarea {
     justify-self: start;
     flex-direction: row;
     justify-content: flex-start;
-    min-width: 158px;
+    min-width: 128px;
     max-width: 100%;
     width: fit-content;
-    min-height: 44px;
+    min-height: 38px;
     margin: 0;
-    padding: 6px 12px 6px 7px;
-    gap: 8px;
+    padding: 5px 10px 5px 6px;
+    gap: 6px;
     border-radius: 999px;
   }
 
@@ -1456,25 +1456,25 @@ textarea {
   }
 
   .splash .hero-feature-point span {
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
   }
 
   .splash .hero-feature-point svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 
   .splash .hero-feature-point strong {
-    font-size: 13px;
+    font-size: 12px;
     white-space: nowrap;
   }
 }
 
 @media (max-width: 759px) and (max-height: 680px) {
   section.splash {
-    gap: 12px;
+    gap: 8px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 
